@@ -8,8 +8,7 @@ config :ex_term, ExTermWeb.Endpoint,
   server: false
 
 # In test we don't send emails.
-config :ex_term, ExTerm.Mailer,
-  adapter: Swoosh.Adapters.Test
+config :ex_term, ExTerm.Mailer, adapter: Swoosh.Adapters.Test
 
 # Print only warnings and errors during test
 config :logger, level: :warn
