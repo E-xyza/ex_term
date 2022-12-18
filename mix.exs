@@ -27,18 +27,19 @@ defmodule ExTerm.MixProject do
     )
   end
 
-  defp elixirc_paths(env) when env in @development, do: ["lib", "test/support"]
+  defp elixirc_paths(env) when env in @development, do: ["lib", "dev"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp deps do
     in_dev = Mix.env() in @development
     [
-      {:phoenix, "~> 1.6.15", optional: !in_dev},
-      {:phoenix_html, "~> 3.0", optional: !in_dev},
+      {:phoenix, "~> 1.6.15"},
+      {:phoenix_html, "~> 3.0"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 0.17.5", optional: !in_dev},
+      {:phoenix_live_view, "~> 0.17.5"},
       {:floki, ">= 0.30.0", only: :test},
       {:esbuild, "~> 0.4", runtime: Mix.env() == :dev},
+      {:jason, "~> 1.2"},
       {:plug_cowboy, "~> 2.5", optional: !in_dev}
     ]
   end
