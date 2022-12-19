@@ -10,14 +10,23 @@ defmodule ExTerm.Buffer do
 
   use Phoenix.Component
 
+  alias ExTerm.Buffer.Line
+
   # for now, we'll have a more detailed description later.
   @type line :: term
 
-  def new, do: nil
+  defstruct [count: 0]
+
+  def new, do: %__MODULE__{}
 
   def render(assigns) do
     ~H"""
-    <div id="exterm-buffer"></div>
+    <% total_lines = length(@lines) %>
+    <div id="exterm-buffer" phx-update="append"><%= for {line, index} <- Enum.with_index(@lines) do %>
+    <Line.render line={line} index={@count - total_lines + index}/>
+    <% end %></div>
     """
   end
+
+  defdelegate line_from_row(row), to: Line, as: :from_row
 end

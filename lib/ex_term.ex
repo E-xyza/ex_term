@@ -8,7 +8,7 @@ defmodule ExTerm do
   def render(assigns) do
     ~H"""
     <div id="exterm-terminal" class={class_for(@focus)} phx-keydown="keydown" phx-focus="focus" phx-blur="blur" tabindex="0">
-      <Buffer.render buffer={@buffer}/>
+      <Buffer.render lines={@buffer_lines} count={@buffer.count}/>
       <Console.render console={@console}/>
     </div>
     """
@@ -26,7 +26,7 @@ defmodule ExTerm do
       |> set_console
       |> set_focus
 
-    {:ok, new_socket, temporary_assigns: [buffer: []]}
+    {:ok, new_socket, temporary_assigns: [buffer_lines: []]}
   end
 
   #############################################################################
@@ -86,7 +86,6 @@ defmodule ExTerm do
     socket.assigns.console.dimensions
 
     reply(from, Console.get_dimension(socket.assigns.console, type))
-    |> dbg
 
     {:noreply, socket}
   end
@@ -117,8 +116,8 @@ defmodule ExTerm do
     |> push_buffer(buffer_lines)
   end
 
-  defp push_buffer(socket, _buffer_lines) do
-    socket
+  defp push_buffer(socket, buffer_lines) do
+    assign(socket, :buffer_lines, Enum.reverse(buffer_lines))
   end
 
   def reply({pid, ref}, reply) do

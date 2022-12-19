@@ -10,6 +10,7 @@ defmodule ExTerm.Console do
 
   use Phoenix.Component
 
+  alias ExTerm.Buffer
   alias ExTerm.Style
   alias ExTerm.Console.Cell
   alias ExTerm.Console.Cursor
@@ -94,6 +95,11 @@ defmodule ExTerm.Console do
   end
 
   #############################################################################
+  ## GUARDS
+
+  defguard is_overflowing(console) when console.cursor.row > elem(console.dimensions, 0)
+
+  #############################################################################
   ## COMMON FUNCTIONS
 
   defp put_char_internal(result, ""), do: result
@@ -134,8 +140,40 @@ defmodule ExTerm.Console do
     realign_cursor(cursor_crlf(console), buffer_so_far)
   end
 
+  defp realign_cursor(console, buffer_so_far) when is_overflowing(console) do
+    # thake the first row and convert it to a buffer line.
+    new_buffer_row = Buffer.line_from_row(console.rows[1])
+    realign_cursor(shift_rows(console), [new_buffer_row | buffer_so_far])
+  end
+
   defp realign_cursor(console, buffer_so_far) do
     {console, buffer_so_far}
+  end
+
+  defp shift_rows(console = %{rows: rows, dimensions: {row_count, column_count}, cursor: cursor}) do
+    new_rows = rows
+    |> Map.delete(1)
+    |> Map.new(fn {row_index, row} -> {row_index - 1, row} end)
+    |> Map.put(row_count, Row.new(column_count))
+
+    %{console | rows: new_rows, cursor: %{cursor | row: cursor.row - 1}}
+  end
+
+  def show_rows(rows) do
+    rows
+    |> Enum.sort()
+    |> Enum.map(fn {row_index, row} ->
+      content = row
+      |> Enum.sort
+      |> Enum.map(fn
+        {_, %{char: nil}} -> "."
+        {_, cell} -> cell.char
+      end)
+      row_index_str = String.pad_leading("#{row_index}", 2)
+      IO.puts(["#{row_index_str}: " | content])
+    end)
+
+    rows
   end
 
   defimpl Inspect do

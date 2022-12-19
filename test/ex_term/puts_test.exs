@@ -55,5 +55,22 @@ defmodule ExTermTest.PutsTest do
       assert Enum.join(List.duplicate("a", 80)) == FlokiTools.line_to_text(doc, 1)
       assert "a" = FlokiTools.line_to_text(doc, 2)
     end
+
+    test "column wrap when it gets really big", %{conn: conn} do
+      # note that IO.puts will put on a last newline here.
+      long_input = 1..40
+      |> Enum.map(&"#{&1}")
+      |> Enum.join("\n")
+
+      {:ok, view, _html} = live(conn, "/")
+
+      puts(long_input)
+
+      doc = render_parsed(view)
+
+      for line <- 1..39, do: assert "#{line + 1}" == FlokiTools.line_to_text(doc, line)
+
+      assert "1" == FlokiTools.buffer_last(doc)
+    end
   end
 end

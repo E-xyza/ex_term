@@ -23,7 +23,12 @@ defmodule ExTermTest.FlokiTools do
   end
 
   def char_at(content, row, column) do
-    [{"div", _, content}] = Floki.find(content, "#exterm-cell-#{row}-#{column}")
-    IO.iodata_to_binary(content)
+    [{"div", _, cell_content}] = Floki.find(content, "#exterm-cell-#{row}-#{column}")
+    IO.iodata_to_binary(cell_content)
+  end
+
+  def buffer_last(content) do
+    [{"div", _, buffer_content}] = Floki.find(content, "#exterm-buffer")
+    Floki.text(buffer_content)
   end
 end
