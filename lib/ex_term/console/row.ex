@@ -16,8 +16,13 @@ defmodule ExTerm.Console.Row do
       })
 
     ~H"""
-    <div id={@id}>
-      <%= for column_index <- 1..@total_columns do %><Cell.render row_index={@row_index} column_index={column_index} cell={@row[column_index]}/><% end %>
+    <div id={@id}, class="exterm-row">
+      <%= for column_index <- 1..@total_columns do %><Cell.render
+        row_index={@row_index}
+        column_index={column_index}
+        cell={@row[column_index]}
+        cursor={@cursor}
+      /><% end %>
     </div>
     """
   end

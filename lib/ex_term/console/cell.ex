@@ -11,9 +11,16 @@ defmodule ExTerm.Console.Cell do
   def render(assigns) do
     assigns =
       Map.merge(assigns, %{
-        id: "exterm-cell-#{assigns.row_index}-#{assigns.column_index}"
+        id: "exterm-cell-#{assigns.row_index}-#{assigns.column_index}",
+        classes: ["exterm-cell", maybe_cursor(assigns)]
       })
 
-    ~H"<div id={@id} style={@cell.style}><%= @cell.char %></div>"
+    ~H(<div id={@id} class={@classes} style={@cell.style}><%= @cell.char %></div>)
   end
+
+  defp maybe_cursor(%{cursor: %{row: row, column: column}, row_index: row, column_index: column}) do
+    " exterm-cursor"
+  end
+
+  defp maybe_cursor(_), do: []
 end

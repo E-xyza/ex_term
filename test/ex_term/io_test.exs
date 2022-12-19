@@ -4,7 +4,6 @@ defmodule ExTermTest.IoTest do
 
   alias ExTermTest.Tools
   alias IEx.Server.Relay
-  alias Plug.Conn
 
   import Phoenix.LiveViewTest
 
@@ -19,12 +18,27 @@ defmodule ExTermTest.IoTest do
       relay_pid = Relay.pid()
       IO.puts(relay_pid, "test")
 
-      assert "test" =
-               view
-               |> render
-               |> Floki.parse_document!()
-               |> Floki.find("#exterm-row-1")
-               |> Tools.floki_line_to_text()
+      doc = view
+      |> render
+      |> Floki.parse_document!()
+
+      assert "test" = Tools.floki_line_to_text(doc, 1)
+      assert {2, 1} = Tools.cursor_location(doc)
+    end
+
+    test "a crlf is split between two lines", %{conn: conn} do
+      {:ok, view, html} = live(conn, "/")
+
+      relay_pid = Relay.pid()
+      IO.puts(relay_pid, "test1\ntest2")
+
+      doc = view
+      |> render
+      |> Floki.parse_document!()
+
+      assert "test1" = Tools.floki_line_to_text(doc, 1)
+      assert "test2" = Tools.floki_line_to_text(doc, 2)
+      assert {3, 1} = Tools.cursor_location(doc)
     end
   end
 end

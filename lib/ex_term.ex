@@ -85,7 +85,13 @@ defmodule ExTerm do
     {:noreply, socket}
   end
 
-  defp get_geometry_impl(_addr, type, socket) do
+  defp get_geometry_impl(from, type, socket = %{console: %{dimensions: {rows, columns}}}) do
+    value = case type do
+      :columns -> columns
+      :rows -> rows
+    end
+    
+    reply(from, value)
     {:noreply, socket}
   end
 
