@@ -83,16 +83,11 @@ defmodule ExTerm do
   end
 
   defp get_geometry_impl(from, type, socket) do
-    {rows, columns} = socket.assigns.console.dimensions
+    socket.assigns.console.dimensions
 
-    value =
-      case type do
-        :columns -> columns
-        :rows -> rows
-      end
+    reply(from, Console.get_dimension(socket.assigns.console, type))
+    |> dbg
 
-    reply(from, value)
-    
     {:noreply, socket}
   end
 

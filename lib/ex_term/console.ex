@@ -55,8 +55,10 @@ defmodule ExTerm.Console do
   #############################################################################
   ## API
 
-  @type console_response :: {t, [Buffer.line()]}
+  @type dimension_request :: :rows | :column
+  @spec get_dimension(t, dimension_request) :: non_neg_integer
 
+  @type console_response :: {t, [Buffer.line()]}
   @spec put_chars(t, String.t()) :: console_response
   @spec start_prompt(GenServer.from(), t, String.t()) :: console_response
   @spec push_key(t, String.t()) :: console_response
@@ -64,6 +66,13 @@ defmodule ExTerm.Console do
 
   #############################################################################
   ## API IMPLEMENTATIONS
+
+  def get_dimension(%{dimensions: {rows, columns}}, request) do
+    case request do
+      :rows -> rows
+      :columns -> columns
+    end
+  end
 
   def put_chars(console, chars), do: put_char_internal({console, []}, chars)
 
@@ -119,5 +128,11 @@ defmodule ExTerm.Console do
 
   defp realign_cursor(console, buffer_so_far) do
     {console, buffer_so_far}
+  end
+
+  defimpl Inspect do
+    def inspect(console, _opts) do
+      "#ExTerm.Console<>"
+    end
   end
 end

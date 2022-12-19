@@ -23,8 +23,8 @@ defmodule ExTermTest.GetsTest do
       {:ok, view, html} = live(conn, "/")
 
       refute html
-      |> Floki.parse_document!
-      |> FlokiTools.cursor_active?
+             |> Floki.parse_document!()
+             |> FlokiTools.cursor_active?()
 
       relay_pid = Relay.pid()
 
@@ -46,9 +46,10 @@ defmodule ExTermTest.GetsTest do
       assert {1, 7} = FlokiTools.cursor_location(doc)
       assert FlokiTools.cursor_active?(doc)
 
-      assert "a" == view
-             |> push_key("a")
-             |> FlokiTools.char_at(1, 7)
+      assert "a" ==
+               view
+               |> push_key("a")
+               |> FlokiTools.char_at(1, 7)
 
       doc = push_key(view, "Enter")
       assert {2, 1} = FlokiTools.cursor_location(doc)
