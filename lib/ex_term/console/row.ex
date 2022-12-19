@@ -22,6 +22,7 @@ defmodule ExTerm.Console.Row do
         column_index={column_index}
         cell={@row[column_index]}
         cursor={@cursor}
+        prompt={@prompt}
       /><% end %>
     </div>
     """

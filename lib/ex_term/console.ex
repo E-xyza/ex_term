@@ -28,7 +28,9 @@ defmodule ExTerm.Console do
   defstruct cursor: Cursor.new(),
             rows: @default_rows,
             dimensions: {@default_row_count, @default_column_count},
-            style: Style.new()
+            style: Style.new(),
+            prompt: nil,
+            prompt_buf: []
 
   @type rows :: %{optional(pos_integer) => Row.t()}
   @type t :: %__MODULE__{cursor: Cursor.t(), rows: rows}
@@ -36,20 +38,54 @@ defmodule ExTerm.Console do
   def new, do: %__MODULE__{}
 
   def render(%{console: assigns}) do
-    assigns = Map.merge(assigns, %{
-      total_rows: map_size(assigns.rows)
-    })
+    assigns =
+      Map.merge(assigns, %{
+        total_rows: map_size(assigns.rows)
+      })
 
     ~H"""
     <div id="exterm-console">
       <%= for row_index <- 1..@total_rows do %>
-        <Row.render row_index={row_index} row={@rows[row_index]} cursor={@cursor}/>
+        <Row.render row_index={row_index} row={@rows[row_index]} cursor={@cursor} prompt={!is_nil(@prompt)}/>
       <% end %>
     </div>
     """
   end
 
+  #############################################################################
+  ## API
+
+  @type console_response :: {t, [Buffer.line()]}
+
+  @spec put_chars(t, String.t()) :: console_response
+  @spec start_prompt(GenServer.from(), t, String.t()) :: console_response
+  @spec push_key(t, String.t()) :: console_response
+  @spec hit_enter(t) :: console_response
+
+  #############################################################################
+  ## API IMPLEMENTATIONS
+
   def put_chars(console, chars), do: put_char_internal({console, []}, chars)
+
+  def start_prompt(from, console, prompt) do
+    {console, buffer_lines} = put_char_internal({console, []}, prompt)
+    {%{console | prompt: from}, buffer_lines}
+  end
+
+  def push_key(console, key) do
+    put_char_internal({%{console | prompt_buf: [console.prompt_buf | key]}, []}, key)
+  end
+
+  def hit_enter(console) do
+    ExTerm.reply(console.prompt, IO.iodata_to_binary(console.prompt_buf))
+
+    %{console | prompt_buf: [], prompt: nil}
+    |> cursor_crlf
+    |> realign_cursor([])
+  end
+
+  #############################################################################
+  ## COMMON FUNCTIONS
 
   defp put_char_internal(result, ""), do: result
 
@@ -62,9 +98,7 @@ defmodule ExTerm.Console do
     |> put_char_internal(rest)
   end
 
-  defp put_char_in_place(console = %{cursor: cursor}, "\n") do
-    %{console | cursor: %{cursor | row: cursor.row + 1, column: 1}}
-  end
+  defp put_char_in_place(console, "\n"), do: cursor_crlf(console)
 
   defp put_char_in_place(console = %{cursor: cursor}, char) do
     new_cell = %Cell{style: console.style, char: char}
@@ -72,11 +106,15 @@ defmodule ExTerm.Console do
 
     console
     |> Map.put(:rows, new_rows)
-    |> advance_cursor
+    |> cursor_advance
   end
 
-  defp advance_cursor(console = %{cursor: cursor}) do
+  defp cursor_advance(console = %{cursor: cursor}) do
     %{console | cursor: %{cursor | column: cursor.column + 1}}
+  end
+
+  defp cursor_crlf(console = %{cursor: cursor}) do
+    %{console | cursor: %{cursor | column: 1, row: cursor.row + 1}}
   end
 
   defp realign_cursor(console, buffer_so_far) do

@@ -10,6 +10,9 @@ defmodule ExTerm.Buffer do
 
   use Phoenix.Component
 
+  # for now, we'll have a more detailed description later.
+  @type line :: term
+
   def new, do: nil
 
   def render(assigns) do

@@ -4,7 +4,13 @@ div.exterm.exterm-focused {
     border-width: 2px;
 }
 
-div.exterm {
+div.exterm.exterm-blurred {
+    border-style: solid;
+    border-color: black;
+    border-width: 2px;
+}
+
+div#exterm-terminal {
     background-color: black;
     color: white;
     font-family: monospace;
@@ -12,11 +18,13 @@ div.exterm {
     height: 40em;
 }
 
-div.exterm.exterm-blurred div.exterm-cursor {
-    opacity: 0;
+div.exterm.exterm-blurred div.exterm-cursor.exterm-cursor-active {
+    border-color: white;
+    border-width: 1px;
+    border-style: solid;
 }
 
-div.exterm.exterm-focused div.exterm-cursor {
+div.exterm.exterm-focused div.exterm-cursor.exterm-cursor-active {
     animation: blinker 1s linear infinite;
 }
 
@@ -34,6 +42,6 @@ div.exterm-cell {
 
 @keyframes blinker {
     50% {
-      opacity: 0;
+      background-color: white;
     }
   }
