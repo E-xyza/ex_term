@@ -2,8 +2,6 @@ defmodule ExTermTest.FocusTest do
   use ExUnit.Case, async: true
   use ExTermWeb.ConnCase
 
-  alias Plug.Conn
-
   import Phoenix.LiveViewTest
 
   setup %{conn: conn} do

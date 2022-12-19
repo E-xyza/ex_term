@@ -1,4 +1,4 @@
-defmodule ExTermTest.GetsTest do
+defmodule ExTermTest.GeometryTest do
   use ExUnit.Case, async: true
   use ExTermWeb.ConnCase
 
