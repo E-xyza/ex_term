@@ -126,12 +126,20 @@ defmodule ExTerm.Console do
     %{console | cursor: %{cursor | column: 1, row: cursor.row + 1}}
   end
 
+  defp realign_cursor(
+         console = %{cursor: %{column: column}, dimensions: {_, column_limit}},
+         buffer_so_far
+       )
+       when column > column_limit do
+    realign_cursor(cursor_crlf(console), buffer_so_far)
+  end
+
   defp realign_cursor(console, buffer_so_far) do
     {console, buffer_so_far}
   end
 
   defimpl Inspect do
-    def inspect(console, _opts) do
+    def inspect(_console, _opts) do
       "#ExTerm.Console<>"
     end
   end
