@@ -42,14 +42,16 @@ defmodule LiveTerm.Style do
           overlined: boolean
         }
 
+  def new, do: %__MODULE__{}
+
   @keys ~w(height width color bgcolor blink intensity frame conceal italic underline crossed_out overlined)a
   def to_iodata(css) do
     Enum.flat_map(@keys, fn key ->
-      List.wrap(to_css(key, Map.get(css, key)))
+      List.wrap(kv_to_css(key, Map.get(css, key)))
     end)
   end
 
-  defp to_css(key, value) do
+  defp kv_to_css(key, value) do
     if value, do: "#{key}: #{value}; "
   end
 end
