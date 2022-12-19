@@ -22,7 +22,6 @@ defmodule ExTermWeb do
       use Phoenix.Controller, namespace: ExTermWeb
 
       import Plug.Conn
-      import ExTermWeb.Gettext
       alias ExTermWeb.Router.Helpers, as: Routes
     end
   end
@@ -30,7 +29,7 @@ defmodule ExTermWeb do
   def view do
     quote do
       use Phoenix.View,
-        root: "lib/ex_term_web/templates",
+        root: "dev/ex_term_web/templates",
         namespace: ExTermWeb
 
       # Import convenience functions from controllers
@@ -80,7 +79,6 @@ defmodule ExTermWeb do
   def channel do
     quote do
       use Phoenix.Channel
-      import ExTermWeb.Gettext
     end
   end
 
@@ -96,7 +94,6 @@ defmodule ExTermWeb do
       import Phoenix.View
 
       import ExTermWeb.ErrorHelpers
-      import ExTermWeb.Gettext
       alias ExTermWeb.Router.Helpers, as: Routes
     end
   end

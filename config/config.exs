@@ -1,5 +1,7 @@
 import Config
 
+config :phoenix, :json_library, Jason
+
 # Configures the endpoint
 config :ex_term, ExTermWeb.Endpoint,
   url: [host: "localhost"],

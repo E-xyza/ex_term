@@ -9,7 +9,7 @@ defmodule ExTerm.MixProject do
       version: "0.1.0",
       elixir: "~> 1.12",
       elixirc_paths: elixirc_paths(Mix.env()),
-      compilers: [:gettext] ++ Mix.compilers(),
+      compilers: Mix.compilers(),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(Mix.env()),
       deps: deps()
@@ -32,6 +32,7 @@ defmodule ExTerm.MixProject do
 
   defp deps do
     in_dev = Mix.env() in @development
+
     [
       {:phoenix, "~> 1.6.15"},
       {:phoenix_html, "~> 3.0"},
