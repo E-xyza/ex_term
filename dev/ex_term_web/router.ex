@@ -14,9 +14,9 @@ defmodule ExTermWeb.Router do
     plug :accepts, ["json"]
   end
 
-  scope "/", ExTermWeb do
+  scope "/" do
     pipe_through :browser
 
-    live "/", ExTermWeb.TestLive
+    live "/", ExTerm
   end
 end

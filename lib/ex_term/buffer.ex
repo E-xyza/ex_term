@@ -10,6 +10,8 @@ defmodule ExTerm.Buffer do
 
   use Phoenix.Component
 
+  def new, do: nil
+
   def render(assigns) do
     ~H"""
     <div id="exterm-buffer"></div>

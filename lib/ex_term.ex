@@ -14,26 +14,8 @@ defmodule ExTerm do
     """
   end
 
-  def line(assigns) do
-    ~H"""
-    <div id={@id}><%= for {css, text} <- @spans do %><span style={css}><%= text %></span><% end %></div>
-    """
-  end
-
-  def cell(assigns) do
-    if assigns.cursor do
-      ~H"""
-      <div class="exterm-cell exterm-cursor">_</div>
-      """
-    else
-      ~H"""
-      <div style={@style} id={@id} class="exterm-cell"><%= render_slot(@inner_block) %></div>
-      """
-    end
-  end
-
   defp class_for(state) do
-    if state, do: "exterm exterm-focused", else: "exterm exterm-faded"
+    if state, do: "exterm exterm-focused", else: "exterm exterm-blurred"
   end
 
   def mount(_, _, socket) do
@@ -42,9 +24,13 @@ defmodule ExTerm do
       |> set_tty
       |> set_buffer
       |> set_console
+      |> set_focus
 
     {:ok, new_socket, temporary_assigns: [buffer: []]}
   end
+
+  #############################################################################
+  ## Socket Reducers
 
   defp set_tty(socket) do
     if connected?(socket) do
@@ -56,9 +42,6 @@ defmodule ExTerm do
     end
   end
 
-  #############################################################################
-  ## Socket Reducers
-
   defp set_console(socket, console \\ Console.new()) do
     assign(socket, console: console)
   end
@@ -67,15 +50,19 @@ defmodule ExTerm do
     assign(socket, buffer: buffer)
   end
 
+  defp set_focus(socket, focus \\ false) do
+    assign(socket, focus: focus)
+  end
+
   #############################################################################
   ## LIVEVIEW EVENT IMPLEMENTATIONS
 
   defp focus_impl(_payload, socket) do
-    {:noreply, socket}
+    {:noreply, set_focus(socket, true)}
   end
 
   defp blur_impl(_payload, socket) do
-    {:noreply, socket}
+    {:noreply, set_focus(socket, false)}
   end
 
   #############################################################################
@@ -89,7 +76,7 @@ defmodule ExTerm do
     {:noreply, socket}
   end
 
-  defp get_geometry_impl(addr, type, socket) do
+  defp get_geometry_impl(_addr, type, socket) do
     {:noreply, socket}
   end
 

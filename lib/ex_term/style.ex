@@ -1,4 +1,4 @@
-defmodule LiveTerm.Style do
+defmodule ExTerm.Style do
   @moduledoc false
   defstruct [
     :height,
@@ -45,17 +45,15 @@ defmodule LiveTerm.Style do
   def new, do: %__MODULE__{}
 
   @keys ~w(height width color bgcolor blink intensity frame conceal italic underline crossed_out overlined)a
-  def to_iodata(css) do
-    Enum.flat_map(@keys, fn key ->
-      List.wrap(kv_to_css(key, Map.get(css, key)))
-    end)
+  def to_iodata(style) do
+    Enum.flat_map(@keys, &kv_to_css(&1, Map.get(style, &1)))
   end
 
   defp kv_to_css(key, value) do
-    if value, do: "#{key}: #{value}; "
+    List.wrap(if value, do: [key, ":", value, "; "])
   end
 end
 
-defimpl Phoenix.HTML.Safe, for: LiveTerm.CSS do
-  defdelegate to_iodata(css), to: LiveTerm.CSS
+defimpl Phoenix.HTML.Safe, for: ExTerm.Style do
+  defdelegate to_iodata(css), to: ExTerm.Style
 end

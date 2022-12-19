@@ -21,13 +21,14 @@ defmodule ExTerm.MixProject do
       if Mix.env() in @development do
         [
           mod: {ExTerm.Application, []},
-          extra_applications: [:logger, :runtime_tools]
+          extra_applications: [:logger, :runtime_tools, :iex]
         ]
       end
     )
   end
 
-  defp elixirc_paths(env) when env in @development, do: ["lib", "dev"]
+  defp elixirc_paths(:dev), do: ["lib", "dev"]
+  defp elixirc_paths(:test), do: ["lib", "dev", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp deps do

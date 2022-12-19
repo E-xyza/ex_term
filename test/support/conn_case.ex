@@ -17,21 +17,22 @@ defmodule ExTermWeb.ConnCase do
 
   use ExUnit.CaseTemplate
 
-  using do
+  defmacro __using__(_) do
     quote do
-      # Import conveniences for testing with connections
-      import Plug.Conn
       import Phoenix.ConnTest
-      import ExTermWeb.ConnCase
+      import Phoenix.LiveViewTest
 
+      alias Plug.Conn
       alias ExTermWeb.Router.Helpers, as: Routes
 
       # The default endpoint for testing
       @endpoint ExTermWeb.Endpoint
-    end
-  end
 
-  setup _tags do
-    {:ok, conn: Phoenix.ConnTest.build_conn()}
+      setup do
+        conn = build_conn()
+        {:ok, view, html} = live(conn, "/")
+        {:ok, view: view, html: html}
+      end
+    end
   end
 end
