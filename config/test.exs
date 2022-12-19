@@ -7,8 +7,7 @@ config :ex_term, ExTermWeb.Endpoint,
   secret_key_base: "JF508wY58zm85QD5zUDQffsi91vvxJ9K+RY2SLfI7n3TZk5ITte042COtDpb/oRg",
   server: false
 
-# In test we don't send emails.
-config :ex_term, ExTerm.Mailer, adapter: Swoosh.Adapters.Test
+config :ex_term, :io_server, IEx.Server.Mock
 
 # Print only warnings and errors during test
 config :logger, level: :warn

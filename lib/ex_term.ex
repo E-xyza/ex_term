@@ -35,7 +35,8 @@ defmodule ExTerm do
   defp set_tty(socket) do
     if connected?(socket) do
       # TODO: make this supervised
-      {:ok, tty} = Tty.start_link()
+      {:ok, tty} = Tty.start_link([])
+
       assign(socket, tty: tty)
     else
       socket
@@ -68,11 +69,13 @@ defmodule ExTerm do
   #############################################################################
   ## IO IMPLEMENTATIONS
 
-  defp put_chars_impl(_addr, _chars, socket) do
+  defp put_chars_impl(from, chars, socket) do
+    reply(from, :ok)
+    |> dbg
     {:noreply, socket}
   end
 
-  defp get_line_impl(_addr, _prompt, socket) do
+  defp get_line_impl(_from, _prompt, socket) do
     {:noreply, socket}
   end
 
@@ -100,23 +103,23 @@ defmodule ExTerm do
   #############################################################################
   ## Generic Tools
 
-  defp reply({from, ref}, reply) do
-    send(from, {:io_reply, ref, reply})
+  defp reply({pid, ref}, reply) do
+    send(pid, {:io_reply, ref, reply})
   end
 
   #############################################################################
   ## EVENT ROUTERS
 
-  defp handle_io_request(addr, {:put_chars, :unicode, str}, socket) do
-    put_chars_impl(addr, str, socket)
+  defp handle_io_request(from, {:put_chars, :unicode, str}, socket) do
+    put_chars_impl(from, str, socket)
   end
 
-  defp handle_io_request(addr, {:get_line, :unicode, prompt}, socket) do
-    get_line_impl(addr, prompt, socket)
+  defp handle_io_request(from, {:get_line, :unicode, prompt}, socket) do
+    get_line_impl(from, prompt, socket)
   end
 
-  defp handle_io_request(addr, {:get_geometry, type}, socket) do
-    get_geometry_impl(addr, type, socket)
+  defp handle_io_request(from, {:get_geometry, type}, socket) do
+    get_geometry_impl(from, type, socket)
   end
 
   defp handle_keydown("Enter", socket), do: enter_impl(socket)
@@ -132,7 +135,7 @@ defmodule ExTerm do
     {:noreply, socket}
   end
 
-  def handle_info({:io_request, from, ref, request}, socket) do
-    handle_io_request({from, ref}, request, socket)
+  def handle_info({:io_request, pid, ref, request}, socket) do
+    handle_io_request({pid, ref}, request, socket)
   end
 end

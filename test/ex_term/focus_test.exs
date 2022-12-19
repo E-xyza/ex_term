@@ -6,7 +6,11 @@ defmodule ExTermTest.FocusTest do
 
   import Phoenix.LiveViewTest
 
-  @endpoint ExTermWeb.Endpoint
+  setup %{conn: conn} do
+    Mox.stub_with(IEx.Server.Mock, IEx.Server.Original)
+    {:ok, view, html} = live(conn, "/")
+    {:ok, view: view, html: html}
+  end
 
   test "focus starts as blurred", %{html: html} do
     [classes] = html

@@ -14,6 +14,6 @@ defmodule ExTerm.Console.Cell do
         id: "exterm-cell-#{assigns.row_index}-#{assigns.column_index}"
       })
 
-    ~H"<span id={@id} style={@cell.style}><%= @cell.char %></span>"
+    ~H"<div id={@id} style={@cell.style}><%= @cell.char %></div>"
   end
 end

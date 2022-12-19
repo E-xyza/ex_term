@@ -29,9 +29,7 @@ defmodule ExTermWeb.ConnCase do
       @endpoint ExTermWeb.Endpoint
 
       setup do
-        conn = build_conn()
-        {:ok, view, html} = live(conn, "/")
-        {:ok, view: view, html: html}
+        {:ok, conn: build_conn()}
       end
     end
   end
