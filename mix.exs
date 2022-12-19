@@ -43,7 +43,7 @@ defmodule ExTerm.MixProject do
       {:mox, "~> 1.0", only: :test},
       {:esbuild, "~> 0.4", runtime: Mix.env() == :dev},
       {:jason, "~> 1.2"},
-      {:plug_cowboy, "~> 2.5", optional: !in_dev},
+      {:plug_cowboy, "~> 2.5", optional: !in_dev}
     ]
   end
 

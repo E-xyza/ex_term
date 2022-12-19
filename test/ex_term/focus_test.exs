@@ -13,21 +13,23 @@ defmodule ExTermTest.FocusTest do
   end
 
   test "focus starts as blurred", %{html: html} do
-    [classes] = html
-    |> Floki.parse_document!
-    |> Floki.find("#exterm-terminal")
-    |> Floki.attribute("class")
+    [classes] =
+      html
+      |> Floki.parse_document!()
+      |> Floki.find("#exterm-terminal")
+      |> Floki.attribute("class")
 
     assert classes =~ "exterm-blurred"
   end
 
   test "getting focus sets the class to focused", %{view: view} do
-    [classes] = view
-    |> element("#exterm-terminal")
-    |> render_focus
-    |> Floki.parse_document!
-    |> Floki.find("#exterm-terminal")
-    |> Floki.attribute("class")
+    [classes] =
+      view
+      |> element("#exterm-terminal")
+      |> render_focus
+      |> Floki.parse_document!()
+      |> Floki.find("#exterm-terminal")
+      |> Floki.attribute("class")
 
     assert classes =~ "exterm-focused"
   end
@@ -37,12 +39,13 @@ defmodule ExTermTest.FocusTest do
     |> element("#exterm-terminal")
     |> render_focus
 
-    [classes] = view
-    |> element("#exterm-terminal")
-    |> render_blur
-    |> Floki.parse_document!
-    |> Floki.find("#exterm-terminal")
-    |> Floki.attribute("class")
+    [classes] =
+      view
+      |> element("#exterm-terminal")
+      |> render_blur
+      |> Floki.parse_document!()
+      |> Floki.find("#exterm-terminal")
+      |> Floki.attribute("class")
 
     assert classes =~ "exterm-blurred"
   end

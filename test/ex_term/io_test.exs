@@ -19,11 +19,12 @@ defmodule ExTermTest.IoTest do
       relay_pid = Relay.pid()
       IO.puts(relay_pid, "test")
 
-      assert "test" = view
-      |> render
-      |> Floki.parse_document!
-      |> Floki.find("#exterm-row-1")
-      |> Tools.floki_line_to_text
+      assert "test" =
+               view
+               |> render
+               |> Floki.parse_document!()
+               |> Floki.find("#exterm-row-1")
+               |> Tools.floki_line_to_text()
     end
   end
 end

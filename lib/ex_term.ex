@@ -70,9 +70,15 @@ defmodule ExTerm do
   ## IO IMPLEMENTATIONS
 
   defp put_chars_impl(from, chars, socket) do
+    {new_console, buffer_lines} = Console.put_chars(socket.assigns.console, chars)
+
+    new_socket =
+      socket
+      |> set_console(new_console)
+      |> push_buffer(buffer_lines)
+
     reply(from, :ok)
-    |> dbg
-    {:noreply, socket}
+    {:noreply, new_socket}
   end
 
   defp get_line_impl(_from, _prompt, socket) do
@@ -99,6 +105,13 @@ defmodule ExTerm do
   end
 
   defp ignore_impl(socket), do: {:noreply, socket}
+
+  #############################################################################
+  ## Common functions
+
+  defp push_buffer(socket, _buffer_lines) do
+    socket
+  end
 
   #############################################################################
   ## Generic Tools
