@@ -107,7 +107,7 @@ defmodule ExTerm.Console do
   @control 27
 
   defp put_char_internal({console, buffer_so_far}, chars = <<@control, _ :: binary>>) do
-    {style, rest} = Style.from_ansi(chars)
+    {style, rest} = Style.from_ansi(console.style, chars)
     new_console = %{console | style: style}
     put_char_internal({new_console, buffer_so_far}, rest)
   end
