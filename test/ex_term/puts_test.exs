@@ -2,6 +2,7 @@ defmodule ExTermTest.PutsTest do
   use ExUnit.Case, async: true
   use ExTermWeb.ConnCase
 
+  alias ExTerm.Style
   alias ExTermTest.FlokiTools
   alias IEx.Server.Relay
 
@@ -71,6 +72,21 @@ defmodule ExTermTest.PutsTest do
       for line <- 1..39, do: assert "#{line + 1}" == FlokiTools.line_to_text(doc, line)
 
       assert "1" == FlokiTools.buffer_last(doc)
+    end
+  end
+
+  describe "when a ANSI code is sent" do
+    test "it can change the style", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/")
+
+      puts("abc" <> IO.ANSI.blue() <> "def")
+
+      doc = render_parsed(view)
+
+      "abcdef" = FlokiTools.line_to_text(doc, 1)
+
+      assert %Style{} == FlokiTools.style_at(doc, {1, 1})
+      assert %Style{color: :blue} == FlokiTools.style_at(doc, {1, 4})
     end
   end
 end

@@ -26,7 +26,7 @@ defmodule ExTerm.Buffer.Line do
     List.wrap(if char, do: %Span{style: cell.style, content: char})
   end
 
-  defp concat_content({_, cell = %{char: nil}}, spans), do: spans
+  defp concat_content({_, %{char: nil}}, spans), do: spans
 
   defp concat_content({_, %{style: style, char: char}}, [head = %{style: style} | rest]) do
     [%{head | content: [head.content | char]} | rest]

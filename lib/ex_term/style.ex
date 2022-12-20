@@ -44,6 +44,19 @@ defmodule ExTerm.Style do
 
   def new, do: %__MODULE__{}
 
+  @spec from_ansi(t, String.t) :: {t, String.t}
+  def from_ansi(style \\ %__MODULE__{}, string)
+
+  for color <- ~w(black red green yellow blue magenta cyan white)a do
+    foreground_control = apply(IO.ANSI, color, [])
+
+    def from_ansi(style, unquote(foreground_control) <> rest) do
+      from_ansi(%{style | color: unquote(color)}, rest)
+    end
+  end
+
+  def from_ansi(style, rest), do: {style, rest}
+
   @keys ~w(height width color bgcolor blink intensity frame conceal italic underline crossed_out overlined)a
   def to_iodata(style) do
     Enum.flat_map(@keys, &kv_to_css(&1, Map.get(style, &1)))

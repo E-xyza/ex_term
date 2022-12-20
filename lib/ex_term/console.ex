@@ -104,6 +104,14 @@ defmodule ExTerm.Console do
 
   defp put_char_internal(result, ""), do: result
 
+  @control 27
+
+  defp put_char_internal({console, buffer_so_far}, chars = <<@control, _ :: binary>>) do
+    {style, rest} = Style.from_ansi(chars)
+    new_console = %{console | style: style}
+    put_char_internal({new_console, buffer_so_far}, rest)
+  end
+
   defp put_char_internal({console, buffer_so_far}, chars) do
     {head, rest} = String.next_grapheme(chars)
 
