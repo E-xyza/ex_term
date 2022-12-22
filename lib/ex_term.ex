@@ -1,6 +1,8 @@
 defmodule ExTerm do
   alias ExTerm.Buffer
   alias ExTerm.Console
+  # TODO: move all Data access to defdelegate from Console.
+  alias ExTerm.Console.Data
   alias ExTerm.Tty
 
   use Phoenix.LiveView
@@ -8,8 +10,10 @@ defmodule ExTerm do
   def render(assigns) do
     ~H"""
     <div id="exterm-terminal" class={class_for(@focus)} phx-keydown="keydown" phx-focus="focus" phx-blur="blur" tabindex="0">
-      <Buffer.render lines={@buffer_lines} count={@buffer.count}/>
-      <Console.render console={@console}/>
+      <%= if @console do %>
+      <Buffer.render buffer={@buffer_lines}/>
+      <Console.render storage={@console} taint={@taint}/>
+      <% end %>
     </div>
     """
   end
@@ -22,9 +26,10 @@ defmodule ExTerm do
     new_socket =
       socket
       |> set_tty
-      |> set_buffer
-      |> set_console
+      |> set_buffer()
+      |> set_console(if connected?(socket), do: Data.new())
       |> set_focus
+      |> taint
 
     {:ok, new_socket, temporary_assigns: [buffer_lines: []]}
   end
@@ -43,17 +48,42 @@ defmodule ExTerm do
     end
   end
 
-  defp set_console(socket, console \\ Console.new()) do
-    assign(socket, console: console)
+  defp set_buffer(socket, buffer \\ %Buffer{}) do
+    assign(socket, buffer: buffer)
   end
 
-  defp set_buffer(socket, buffer \\ Buffer.new()) do
-    assign(socket, buffer: buffer)
+  defp set_console(socket, console) do
+    assign(socket, console: console)
   end
 
   defp set_focus(socket, focus \\ false) do
     assign(socket, focus: focus)
   end
+
+  defp push_buffer_lines(socket, lines) do
+    assign(socket, buffer_lines: lines)
+  end
+
+  # console size is known, but the last line of the console might have moved.
+  # in this case, ship those lines to `buffer` so that the liveview process
+  # can forget they exist.
+  defp adjust_buffer(socket = %{assigns: %{console: console, buffer: buffer}}) do
+    case Data.buffer_shift(console, buffer.top_row) do
+      {[], _} ->
+        socket
+
+      {lines, new_top} ->
+        socket
+        |> set_buffer(%{buffer | top_row: new_top})
+        |> push_buffer_lines(lines)
+    end
+  end
+
+  # since the re-rendering depends on assigns being altered, if all of the
+  # changes occur in the mutable terminal, the re-rendering might miss a diff
+  # and fail to repaint the buffer and console. `taint` function forces a
+  # repaint and reevaluation by altering the socket assigns.
+  defp taint(socket), do: assign(socket, taint: make_ref())
 
   #############################################################################
   ## LIVEVIEW EVENT IMPLEMENTATIONS
@@ -70,23 +100,24 @@ defmodule ExTerm do
   ## IO IMPLEMENTATIONS
 
   defp put_chars_impl(from, chars, socket) do
-    {new_console, buffer_lines} = Console.put_chars(socket.assigns.console, chars)
-    new_socket = repl(socket, new_console, buffer_lines)
-
+    Console.put_chars(socket.assigns.console, chars)
     reply(from, :ok)
+
+    new_socket =
+      socket
+      |> adjust_buffer
+      |> taint
+
     {:noreply, new_socket}
   end
 
   defp get_line_impl(from, prompt, socket) do
-    {new_console, buffer_lines} = Console.start_prompt(from, socket.assigns.console, prompt)
-    {:noreply, repl(socket, new_console, buffer_lines)}
+    Console.start_prompt(from, socket.assigns.console, prompt)
+    {:noreply, socket}
   end
 
   defp get_geometry_impl(from, type, socket) do
-    socket.assigns.console.dimensions
-
     reply(from, Console.get_dimension(socket.assigns.console, type))
-
     {:noreply, socket}
   end
 
@@ -97,28 +128,18 @@ defmodule ExTerm do
 
   defp enter_impl(socket) do
     {new_console, buffer_lines} = Console.hit_enter(socket.assigns.console)
-    {:noreply, repl(socket, new_console, buffer_lines)}
+    {:noreply, socket}
   end
 
   defp key_impl(key, socket) do
     {new_console, buffer_lines} = Console.push_key(socket.assigns.console, key)
-    {:noreply, repl(socket, new_console, buffer_lines)}
+    {:noreply, socket}
   end
 
   defp ignore_impl(socket), do: {:noreply, socket}
 
   #############################################################################
   ## Common functions
-
-  defp repl(socket, new_console, buffer_lines) do
-    socket
-    |> set_console(new_console)
-    |> push_buffer(buffer_lines)
-  end
-
-  defp push_buffer(socket, buffer_lines) do
-    assign(socket, :buffer_lines, Enum.reverse(buffer_lines))
-  end
 
   def reply({pid, ref}, reply) do
     send(pid, {:io_reply, ref, reply})

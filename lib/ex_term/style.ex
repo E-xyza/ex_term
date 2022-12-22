@@ -44,7 +44,7 @@ defmodule ExTerm.Style do
 
   def new, do: %__MODULE__{}
 
-  @spec from_ansi(t, String.t) :: {t, String.t}
+  @spec from_ansi(t, String.t()) :: {t, String.t()}
   def from_ansi(style \\ %__MODULE__{}, string)
 
   for color <- ~w(black red green yellow blue magenta cyan white)a do
@@ -83,7 +83,11 @@ defmodule ExTerm.Style do
     end
   end
 
-  for {attribute, clear} <- %{italic: :not_italic, underline: :no_underline, overlined: :not_overlined} do
+  for {attribute, clear} <- %{
+        italic: :not_italic,
+        underline: :no_underline,
+        overlined: :not_overlined
+      } do
     clear_control = apply(IO.ANSI, clear, [])
 
     def from_ansi(style, unquote(clear_control) <> rest) do
@@ -121,8 +125,13 @@ defmodule ExTerm.Style do
     end
   end
 
-  for {field, function} <- %{frame: :not_framed_encircled, color: :default_color, bgcolor: :default_background} do
+  for {field, function} <- %{
+        frame: :not_framed_encircled,
+        color: :default_color,
+        bgcolor: :default_background
+      } do
     clear = apply(IO.ANSI, function, [])
+
     def from_ansi(style, unquote(clear) <> rest) do
       from_ansi(%{style | unquote(field) => nil}, rest)
     end

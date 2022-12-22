@@ -10,15 +10,13 @@ defmodule ExTermTest.StyleTest do
       foreground_text = apply(IO.ANSI, color, []) <> "text"
 
       test "assigns foreground #{color} correctly" do
-        assert {%{color: unquote(color)}, "text"} =
-                 Style.from_ansi(unquote(foreground_text))
+        assert {%{color: unquote(color)}, "text"} = Style.from_ansi(unquote(foreground_text))
       end
 
       background_text = apply(IO.ANSI, :"#{color}_background", []) <> "text"
 
       test "assigns background #{color} correctly" do
-        assert {%{bgcolor: unquote(color)}, "text"} =
-                 Style.from_ansi(unquote(background_text))
+        assert {%{bgcolor: unquote(color)}, "text"} = Style.from_ansi(unquote(background_text))
       end
 
       lt_color = :"light-#{color}"
@@ -44,8 +42,7 @@ defmodule ExTermTest.StyleTest do
       attribute_text = apply(IO.ANSI, attribute, []) <> "text"
 
       test "assigns #{attribute} correctly" do
-        assert {%{unquote(attribute) => true}, "text"} =
-                 Style.from_ansi(unquote(attribute_text))
+        assert {%{unquote(attribute) => true}, "text"} = Style.from_ansi(unquote(attribute_text))
       end
     end
 
@@ -70,8 +67,7 @@ defmodule ExTermTest.StyleTest do
       set_text = apply(IO.ANSI, intensity, []) <> "text"
 
       test "sets intensity #{intensity} correctly" do
-        assert {%{intensity: unquote(intensity)}, "text"} =
-                 Style.from_ansi(unquote(set_text))
+        assert {%{intensity: unquote(intensity)}, "text"} = Style.from_ansi(unquote(set_text))
       end
     end
   end
@@ -82,8 +78,7 @@ defmodule ExTermTest.StyleTest do
       set_text = apply(IO.ANSI, :"blink_#{blink_type}", []) <> "text"
 
       test "sets blink #{blink_type} correctly" do
-        assert {%{blink: unquote(blink_type)}, "text"} =
-                 Style.from_ansi(unquote(set_text))
+        assert {%{blink: unquote(blink_type)}, "text"} = Style.from_ansi(unquote(set_text))
       end
 
       test "clears blink #{blink_type} correctly" do
@@ -101,8 +96,7 @@ defmodule ExTermTest.StyleTest do
       set_text = apply(IO.ANSI, frame_type, []) <> "text"
 
       test "sets frame #{frame_type} correctly" do
-        assert {%{frame: unquote(frame_type)}, "text"} =
-                 Style.from_ansi(unquote(set_text))
+        assert {%{frame: unquote(frame_type)}, "text"} = Style.from_ansi(unquote(set_text))
       end
 
       test "clears frame #{frame_type} correctly" do
