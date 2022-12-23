@@ -8,17 +8,17 @@ defmodule ExTerm.Console.Cell do
   @type t :: %__MODULE__{style: Style.t(), char: nil | String.t()}
   def new, do: %__MODULE__{}
 
-  def render(%{cell: {{row, column}, cell}, cursor: cursor}) do
+  def render(%{cell: {rc = {row, column}, cell}, cursor: cursor, prompt: prompt}) do
     cursor_style =
-      List.wrap(
-        if cursor == {row, column} do
-          "exterm-cursor"
-        end
-      )
+      case {cursor, prompt} do
+        {^rc, true} -> ["exterm-cursor ", "exterm-cursor-active "]
+        {^rc, false} -> ["exterm-cursor "]
+        _ -> []
+      end
 
     assigns = %{
       id: "exterm-cell-#{row}-#{column}",
-      classes: ["exterm-cell" | cursor_style],
+      classes: ["exterm-cell " | cursor_style],
       cell: cell
     }
 

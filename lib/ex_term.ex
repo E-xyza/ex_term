@@ -3,7 +3,6 @@ defmodule ExTerm do
   alias ExTerm.Console
   # TODO: move all Data access to defdelegate from Console.
   alias ExTerm.Console.Data
-  alias ExTerm.Console.Row
   alias ExTerm.Tty
 
   use Phoenix.LiveView
@@ -13,7 +12,7 @@ defmodule ExTerm do
     <div id="exterm-terminal" class={class_for(@focus)} phx-keydown="keydown" phx-focus="focus" phx-blur="blur" tabindex="0">
       <%= if @console do %>
       <Buffer.render buffer={@buffer_lines}/>
-      <Console.render rows={@rows} cursor={@cursor}/>
+      <Console.render rows={@rows} cursor={@cursor} prompt={@prompt}/>
       <% end %>
     </div>
     """
@@ -27,9 +26,11 @@ defmodule ExTerm do
     new_socket =
       socket
       |> set_tty
-      |> set_buffer()
+      |> set_buffer
       |> set_console(if connected?(socket), do: Data.new())
       |> set_focus
+      |> set_prompt
+      |> set_key_buffer
       |> repaint
 
     {:ok, new_socket, temporary_assigns: [buffer_lines: []]}
@@ -49,46 +50,44 @@ defmodule ExTerm do
     end
   end
 
-  defp set_buffer(socket, buffer \\ %Buffer{}) do
-    assign(socket, buffer: buffer)
-  end
+  defp set_buffer(socket, buffer \\ %Buffer{}), do: assign(socket, buffer: buffer)
+  defp set_console(socket, console), do: assign(socket, console: console, rows: [], cursor: nil)
+  defp set_focus(socket, focus \\ false), do: assign(socket, focus: focus)
+  defp set_prompt(socket, prompting \\ false), do: assign(socket, prompt: prompting)
+  defp set_key_buffer(socket, buffer \\ []), do: assign(socket, key_buffer: buffer)
 
-  defp set_console(socket, console) do
-    assign(socket, console: console, rows: [], cursor: nil)
-  end
-
-  defp set_focus(socket, focus \\ false) do
-    assign(socket, focus: focus)
-  end
-
-  defp push_buffer_lines(socket, lines) do
-    assign(socket, buffer_lines: lines)
-  end
+  defp push_buffer_lines(socket, lines), do: assign(socket, buffer_lines: lines)
 
   # console size is known, but the last line of the console might have moved.
   # in this case, ship those lines to `buffer` so that the liveview process
   # can forget they exist.
   defp adjust_buffer(socket = %{assigns: %{console: console, buffer: buffer}}) do
-    case Data.buffer_shift(console, buffer.top_row) do
-      {[], _} ->
-        socket
+    if console do
+      case Data.buffer_shift(console, buffer.top_row) do
+        {[], _} ->
+          socket
 
-      {lines, new_top} ->
-        socket
-        |> set_buffer(%{buffer | top_row: new_top})
-        |> push_buffer_lines(lines)
+        {lines, new_top} ->
+          socket
+          |> set_buffer(%{buffer | top_row: new_top})
+          |> push_buffer_lines(lines)
+      end
+    else
+      socket
     end
   end
 
   defp repaint(socket) do
-    {cursor, rows} =
-      if console = socket.assigns.console do
+    new_socket = %{assigns: %{console: console}} = adjust_buffer(socket)
+
+    {cursor, rows, prompt} =
+      if console do
         Data.console(console)
       else
-        {nil, []}
+        {nil, [], false}
       end
 
-    assign(socket, rows: rows, cursor: cursor)
+    assign(new_socket, rows: rows, cursor: cursor, prompt: prompt)
   end
 
   #############################################################################
@@ -107,9 +106,8 @@ defmodule ExTerm do
 
   defp put_chars_impl(from, chars, socket) do
     Console.put_chars(socket.assigns.console, chars)
-    new_socket = socket
-    |> adjust_buffer
-    |> repaint
+
+    new_socket = repaint(socket)
 
     reply(from, :ok)
 
@@ -117,8 +115,8 @@ defmodule ExTerm do
   end
 
   defp get_line_impl(from, prompt, socket) do
-    # Console.start_prompt(from, socket.assigns.console, prompt)
-    {:noreply, socket}
+    Console.start_prompt(from, socket.assigns.console, prompt)
+    {:noreply, repaint(socket)}
   end
 
   defp get_geometry_impl(from, type, socket) do
@@ -131,14 +129,26 @@ defmodule ExTerm do
 
   @ignores ~w(Shift Alt Control)
 
-  defp enter_impl(socket) do
-    {new_console, buffer_lines} = Console.hit_enter(socket.assigns.console)
-    {:noreply, socket}
+  defp enter_impl(socket = %{assigns: %{console: console, key_buffer: key_buffer}}) do
+    Console.register_input(console, key_buffer)
+
+    new_socket =
+      socket
+      |> repaint()
+      |> set_key_buffer()
+
+    {:noreply, new_socket}
   end
 
   defp key_impl(key, socket) do
-    {new_console, buffer_lines} = Console.push_key(socket.assigns.console, key)
-    {:noreply, socket}
+    Console.push_key(socket.assigns.console, key)
+
+    new_socket =
+      socket
+      |> repaint()
+      |> set_key_buffer([socket.assigns.key_buffer, key])
+
+    {:noreply, new_socket}
   end
 
   defp ignore_impl(socket), do: {:noreply, socket}

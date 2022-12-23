@@ -1,8 +1,6 @@
 defmodule ExTerm.Style do
   @moduledoc false
   defstruct [
-    :height,
-    :width,
     :color,
     :bgcolor,
     :blink,
@@ -28,8 +26,6 @@ defmodule ExTerm.Style do
 
   @type color :: unquote(quoted_color_type)
   @type t :: %__MODULE__{
-          height: nil | String.t(),
-          width: nil | String.t(),
           color: nil | color | String.t(),
           bgcolor: nil | color | String.t(),
           blink: nil | :rapid | :slow,
@@ -47,7 +43,8 @@ defmodule ExTerm.Style do
   @spec from_ansi(t, String.t()) :: {t, String.t()}
   def from_ansi(style \\ %__MODULE__{}, string)
 
-  for color <- ~w(black red green yellow blue magenta cyan white)a do
+  @named_colors ~w(black red green yellow blue magenta cyan white)a
+  for color <- @named_colors do
     foreground_control = apply(IO.ANSI, color, [])
 
     def from_ansi(style, unquote(foreground_control) <> rest) do
@@ -145,16 +142,44 @@ defmodule ExTerm.Style do
 
   def from_ansi(style, rest), do: {style, rest}
 
-  @keys ~w(height width color bgcolor blink intensity frame conceal italic underline crossed_out overlined)a
+  @keys ~w(color bgcolor blink intensity frame conceal italic underline crossed_out overlined)a
   def to_iodata(style) do
     Enum.flat_map(@keys, &kv_to_css(&1, Map.get(style, &1)))
   end
 
   defp kv_to_css(key, value) do
-    List.wrap(if value, do: [to_string(key), ":", to_string(value), "; "])
+    List.wrap(if value, do: [[to_string(key), ":", to_string(value), ";"]])
+  end
+
+  def from_css(css) do
+    css
+    |> String.split(";", trim: true)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reduce(%__MODULE__{}, &style_prop_from_string/2)
+  end
+
+  def style_prop_from_string(prop, style) do
+    case String.split(prop, ":") do
+      ["color", color] -> %{style | color: color_from_prop(color)}
+    end
+  end
+
+  @color_mapping Map.new(@named_colors, fn color -> {"#{color}", color} end)
+  @named_color_strings Map.keys(@color_mapping)
+  defp color_from_prop(color) when color in @named_color_strings do
+    @color_mapping[color]
   end
 end
 
 defimpl Phoenix.HTML.Safe, for: ExTerm.Style do
   defdelegate to_iodata(css), to: ExTerm.Style
+end
+
+defimpl Inspect, for: ExTerm.Style do
+  import Inspect.Algebra
+
+  def inspect(style, _opts) do
+    style_iodata = ExTerm.Style.to_iodata(style)
+    concat(["ExTerm.Style.from_css(", "\"#{style_iodata}\"", ")"])
+  end
 end

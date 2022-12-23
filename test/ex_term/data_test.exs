@@ -12,7 +12,8 @@ defmodule ExTermTest.DataTest do
 
     test "works to get all data", %{table: table} do
       # note the following KWL is ordered.
-      assert [columns: 80, cursor: {1, 1}, rows: 40, style: Style.new()] == Data.metadata(table)
+      assert [columns: 80, cursor: {1, 1}, prompt: false, rows: 40, style: Style.new()] ==
+               Data.metadata(table)
     end
 
     test "works to get single data", %{table: table} do
@@ -28,10 +29,13 @@ defmodule ExTermTest.DataTest do
   describe "console query" do
     test "works in the base case" do
       table = Data.new()
-      expected = for row <- 1..40 do
-        for column <- 1..80, do: {{row, column}, Cell.new()}
-      end
-      assert {{1, 1}, expected} == Data.console(table)
+
+      expected =
+        for row <- 1..40 do
+          for column <- 1..80, do: {{row, column}, Cell.new()}
+        end
+
+      assert {{1, 1}, expected, false} == Data.console(table)
     end
   end
 
@@ -52,13 +56,13 @@ defmodule ExTermTest.DataTest do
     end
 
     test "always puts the column at one", %{table: table} do
-      Data.metadata(table, :cursor, {2, 3})
+      Data.put_metadata(table, cursor: {2, 3})
       do_crlf(table)
       assert {3, 1} = Data.metadata(table, :cursor)
     end
 
     test "if we go beyond the existing rows it adds a new one", %{table: table} do
-      Data.metadata(table, :cursor, {4, 1})
+      Data.put_metadata(table, cursor: {4, 1})
       do_crlf(table)
       assert {5, 1} = Data.metadata(table, :cursor)
       assert 5 == Data.last_row(table)

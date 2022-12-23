@@ -88,8 +88,8 @@ defmodule ExTermTest.PutsTest do
 
       "abcdef" = FlokiTools.line_to_text(doc, 1)
 
-      assert %Style{} == FlokiTools.style_at(doc, {1, 1})
-      assert %Style{color: :blue} == FlokiTools.style_at(doc, {1, 4})
+      assert %Style{} == FlokiTools.style_at(doc, 1, 1)
+      assert %Style{color: :blue} == FlokiTools.style_at(doc, 1, 4)
     end
   end
 end

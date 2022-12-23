@@ -10,12 +10,12 @@ defmodule ExTerm.Console.Row do
     ~H"""
     <div id={@id} class="exterm-row">
       <%= for cell <- @row do %>
-      <Cell.render cell={cell} cursor={@cursor}/>
+      <Cell.render cell={cell} cursor={@cursor} prompt={@prompt}/>
       <% end %>
     </div>
     """
   end
 
   def number([cell | _]), do: number(cell)
-  def number({{row, _} , _}), do: row
+  def number({{row, _}, _}), do: row
 end

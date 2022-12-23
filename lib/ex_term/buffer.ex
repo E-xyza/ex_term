@@ -8,7 +8,7 @@ defmodule ExTerm.Buffer do
     ~H"""
     <div id="exterm-buffer" phx-update="append">
       <%= for row <- @buffer do %>
-      <Row.render row={row} cursor={nil}/>
+      <Row.render row={row} cursor={nil} prompt={false}/>
       <% end %>
     </div>
     """

@@ -1,4 +1,6 @@
 defmodule ExTermTest.FlokiTools do
+  alias ExTerm.Style
+
   def dump(content) do
     content =
       content
@@ -36,8 +38,17 @@ defmodule ExTermTest.FlokiTools do
 
   def buffer_last(content) do
     [{"div", _, buffer_content}] = Floki.find(content, "#exterm-buffer")
+
     buffer_content
-    |> List.last
+    |> List.last()
     |> Floki.text(buffer_content)
+  end
+
+  def style_at(content, row, column) do
+    content
+    |> Floki.find("#exterm-cell-#{row}-#{column}")
+    |> Floki.attribute("style")
+    |> List.first()
+    |> Style.from_css()
   end
 end

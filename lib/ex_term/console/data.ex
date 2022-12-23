@@ -3,8 +3,9 @@ defmodule ExTerm.Console.Data do
   alias ExTerm.Console.Cell
   alias ExTerm.Console.Row
 
-  @defaults [rows: 40, columns: 80, style: Style.new(), cursor: {1, 1}]
+  @defaults [rows: 40, columns: 80, style: Style.new(), cursor: {1, 1}, prompt: false]
   @type coordinate :: {non_neg_integer, non_neg_integer}
+  @type rows :: [[{coordinate, Cell.t()}]]
 
   @spec new(keyword) :: :ets.table()
   def new(opts \\ []) do
@@ -58,15 +59,10 @@ defmodule ExTerm.Console.Data do
   end
 
   @doc """
-  sets metadata on the provided key(s) to the provided value
+  sets metadata on the provided key(s) to the provided value, which must be a kwl
   """
-  def metadata(table, key_or_keys, value_or_values) do
-    to_insert =
-      key_or_keys
-      |> List.wrap()
-      |> Enum.zip(List.wrap(value_or_values))
-
-    :ets.insert(table, to_insert)
+  def put_metadata(table, kvs) do
+    :ets.insert(table, kvs)
   end
 
   @key :"$1"
@@ -84,7 +80,7 @@ defmodule ExTerm.Console.Data do
   defp metadata_key_query(key) when is_atom(key),
     do: [{{@key, @value}, [{:"=:=", @key, key}], [@value]}]
 
-  @spec console(:ets.table) :: {cursor :: coordinate, [[{coordinate, Cell.t}]]}
+  @spec console(:ets.table()) :: {cursor :: coordinate, rows, prompting :: boolean}
   @doc """
   fetches the console region of the table.
 
@@ -94,10 +90,10 @@ defmodule ExTerm.Console.Data do
   # so this code might need to be revisited.
   def console(table) do
     # note that the keys here are in erlang term order.
-    [columns, cursor, rows] = metadata(table, [:columns, :cursor, :rows])
+    [columns, cursor, prompt, rows] = metadata(table, [:columns, :cursor, :prompt, :rows])
     last_row = last_row(table)
     first_row = last_row - rows + 1
-    {cursor, get_rows(table, first_row..last_row, columns)}
+    {cursor, get_rows(table, first_row..last_row, columns), !!prompt}
   end
 
   # generic row fetching
@@ -189,6 +185,8 @@ defmodule ExTerm.Console.Data do
   defp adjust_cursor(cursor, _), do: cursor
 
   @spec transactionalize(:ets.table(), (() -> any)) :: any
+  # this might be a terrible idea.  Consider using atomics, or wrapping the ets table
+  # into a gen_server.
   def transactionalize(table, action) do
     transaction_lock = make_ref()
 
