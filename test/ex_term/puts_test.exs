@@ -51,6 +51,8 @@ defmodule ExTermTest.PutsTest do
 
       puts(long_word)
 
+      Process.sleep(100)
+
       doc = render_parsed(view)
 
       assert Enum.join(List.duplicate("a", 80)) == FlokiTools.line_to_text(doc, 1)
@@ -70,7 +72,7 @@ defmodule ExTermTest.PutsTest do
 
       doc = render_parsed(view)
 
-      for line <- 1..39, do: assert("#{line + 1}" == FlokiTools.line_to_text(doc, line))
+      for line <- 2..40, do: assert("#{line}" == FlokiTools.line_to_text(doc, line))
 
       assert "1" == FlokiTools.buffer_last(doc)
     end

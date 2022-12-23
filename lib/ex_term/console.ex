@@ -20,14 +20,7 @@ defmodule ExTerm.Console do
   @type rows :: %{optional(pos_integer) => Row.t()}
   @type t :: term
 
-  def render(%{storage: data}) do
-    {cursor, cells} = Data.console(data)
-
-    assigns = %{
-      rows: Enum.chunk_by(cells, fn {{row, _}, _} -> row end),
-      cursor: cursor
-    }
-
+  def render(assigns) do
     ~H"""
     <div id="exterm-console">
       <%= for row <- @rows do %>
@@ -60,13 +53,14 @@ defmodule ExTerm.Console do
   end
 
   def put_chars(console, chars) do
-    Data.transactionalize(console, fn ->
+    result = Data.transactionalize(console, fn ->
       put_char_internal(console, chars)
     end)
+    result
   end
 
   def start_prompt(from, console, prompt) do
-    raise "aaaa"
+    raise "a"
     # {console, buffer_lines} = put_char_internal({console, []}, prompt)
     # {%{console | prompt: from}, buffer_lines}
   end

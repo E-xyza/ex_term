@@ -3,6 +3,7 @@ defmodule ExTerm do
   alias ExTerm.Console
   # TODO: move all Data access to defdelegate from Console.
   alias ExTerm.Console.Data
+  alias ExTerm.Console.Row
   alias ExTerm.Tty
 
   use Phoenix.LiveView
@@ -12,7 +13,7 @@ defmodule ExTerm do
     <div id="exterm-terminal" class={class_for(@focus)} phx-keydown="keydown" phx-focus="focus" phx-blur="blur" tabindex="0">
       <%= if @console do %>
       <Buffer.render buffer={@buffer_lines}/>
-      <Console.render storage={@console} taint={@taint}/>
+      <Console.render rows={@rows} cursor={@cursor}/>
       <% end %>
     </div>
     """
@@ -29,7 +30,7 @@ defmodule ExTerm do
       |> set_buffer()
       |> set_console(if connected?(socket), do: Data.new())
       |> set_focus
-      |> taint
+      |> repaint
 
     {:ok, new_socket, temporary_assigns: [buffer_lines: []]}
   end
@@ -53,7 +54,7 @@ defmodule ExTerm do
   end
 
   defp set_console(socket, console) do
-    assign(socket, console: console)
+    assign(socket, console: console, rows: [], cursor: nil)
   end
 
   defp set_focus(socket, focus \\ false) do
@@ -79,11 +80,16 @@ defmodule ExTerm do
     end
   end
 
-  # since the re-rendering depends on assigns being altered, if all of the
-  # changes occur in the mutable terminal, the re-rendering might miss a diff
-  # and fail to repaint the buffer and console. `taint` function forces a
-  # repaint and reevaluation by altering the socket assigns.
-  defp taint(socket), do: assign(socket, taint: make_ref())
+  defp repaint(socket) do
+    {cursor, rows} =
+      if console = socket.assigns.console do
+        Data.console(console)
+      else
+        {nil, []}
+      end
+
+    assign(socket, rows: rows, cursor: cursor)
+  end
 
   #############################################################################
   ## LIVEVIEW EVENT IMPLEMENTATIONS
@@ -101,18 +107,17 @@ defmodule ExTerm do
 
   defp put_chars_impl(from, chars, socket) do
     Console.put_chars(socket.assigns.console, chars)
-    reply(from, :ok)
+    new_socket = socket
+    |> adjust_buffer
+    |> repaint
 
-    new_socket =
-      socket
-      |> adjust_buffer
-      |> taint
+    reply(from, :ok)
 
     {:noreply, new_socket}
   end
 
   defp get_line_impl(from, prompt, socket) do
-    Console.start_prompt(from, socket.assigns.console, prompt)
+    # Console.start_prompt(from, socket.assigns.console, prompt)
     {:noreply, socket}
   end
 

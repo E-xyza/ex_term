@@ -42,6 +42,6 @@ div.exterm-cell {
 
 @keyframes blinker {
     50% {
-      background-color: white;
+        background-color: white;
     }
-  }
+}

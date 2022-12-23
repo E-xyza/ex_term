@@ -1,8 +1,10 @@
 defmodule ExTerm.Console.Data do
   alias ExTerm.Style
   alias ExTerm.Console.Cell
+  alias ExTerm.Console.Row
 
   @defaults [rows: 40, columns: 80, style: Style.new(), cursor: {1, 1}]
+  @type coordinate :: {non_neg_integer, non_neg_integer}
 
   @spec new(keyword) :: :ets.table()
   def new(opts \\ []) do
@@ -82,8 +84,11 @@ defmodule ExTerm.Console.Data do
   defp metadata_key_query(key) when is_atom(key),
     do: [{{@key, @value}, [{:"=:=", @key, key}], [@value]}]
 
+  @spec console(:ets.table) :: {cursor :: coordinate, [[{coordinate, Cell.t}]]}
   @doc """
-  fetches the console region of the table.  Not wrapped in a transaction.
+  fetches the console region of the table.
+
+  Not wrapped in a transaction.
   """
   # it's possible that not wrapping this in a transaction could cause problems
   # so this code might need to be revisited.
@@ -99,10 +104,12 @@ defmodule ExTerm.Console.Data do
   def get_rows(table, row_or_range, columns) do
     case row_or_range do
       first_row..last_row ->
-        :ets.select(table, console_query(first_row, last_row, columns))
+        table
+        |> :ets.select(console_query(first_row, last_row, columns))
+        |> Enum.chunk_by(&Row.number/1)
 
       row when is_integer(row) ->
-        :ets.select(table, console_query(row, row, columns))
+        [:ets.select(table, console_query(row, row, columns))]
     end
   end
 
@@ -138,9 +145,11 @@ defmodule ExTerm.Console.Data do
     last_row = last_row(table)
     new_row = row + 1
     :ets.insert(table, {:cursor, {new_row, 1}})
-    if (new_row > last_row) do
+
+    if new_row > last_row do
       :ets.insert(table, Enum.map(1..columns, &{{new_row, &1}, Cell.new()}))
     end
+
     table
   end
 
@@ -228,5 +237,15 @@ defmodule ExTerm.Console.Data do
       0 ->
         :ok
     end
+  end
+
+  def dump(table) do
+    table
+    |> :ets.select([{{{:_, :_}, :_}, [], [:"$_"]}])
+    |> Enum.chunk_by(&Row.number/1)
+    |> Enum.each(fn row = [{{index, _}, _} | _] ->
+      label = String.pad_leading("#{index}:", 3)
+      IO.puts([label | Enum.map(row, fn {{_, _}, cell} -> List.wrap(cell.char) end)])
+    end)
   end
 end

@@ -4,15 +4,18 @@ defmodule ExTerm.Console.Row do
   alias ExTerm.Console.Cell
 
   def render(assigns) do
-    [{{index, _}, _} | _] = assigns.row
-    assigns = Map.put(assigns, :id, "exterm-row-#{index}")
+    number = number(assigns.row)
+    assigns = Map.put(assigns, :id, "exterm-row-#{number}")
 
     ~H"""
-    <div id={@id}>
+    <div id={@id} class="exterm-row">
       <%= for cell <- @row do %>
       <Cell.render cell={cell} cursor={@cursor}/>
       <% end %>
     </div>
     """
   end
+
+  def number([cell | _]), do: number(cell)
+  def number({{row, _} , _}), do: row
 end

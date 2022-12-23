@@ -28,7 +28,9 @@ defmodule ExTermTest.DataTest do
   describe "console query" do
     test "works in the base case" do
       table = Data.new()
-      expected = for row <- 1..40, column <- 1..80, do: {{row, column}, Cell.new()}
+      expected = for row <- 1..40 do
+        for column <- 1..80, do: {{row, column}, Cell.new()}
+      end
       assert {{1, 1}, expected} == Data.console(table)
     end
   end
@@ -60,7 +62,7 @@ defmodule ExTermTest.DataTest do
       do_crlf(table)
       assert {5, 1} = Data.metadata(table, :cursor)
       assert 5 == Data.last_row(table)
-      assert [{{5, 1}, _}, {{5, 2}, _}, {{5, 3}, _}, {{5, 4}, _}] = Data.get_rows(table, 5, 4)
+      assert [[{{5, 1}, _}, {{5, 2}, _}, {{5, 3}, _}, {{5, 4}, _}]] = Data.get_rows(table, 5, 4)
     end
   end
 end
