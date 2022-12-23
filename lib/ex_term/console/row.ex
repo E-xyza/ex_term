@@ -1,30 +1,21 @@
 defmodule ExTerm.Console.Row do
-  use Phoenix.Component
+  use Phoenix.LiveComponent
+
   alias ExTerm.Console.Cell
 
-  @type t :: %{optional(pos_integer) => Cell.t()}
-
-  @spec new(pos_integer) :: t
-  def new(columns \\ 80),
-    do: for(column_index <- 1..columns, into: %{}, do: {column_index, Cell.new()})
-
   def render(assigns) do
-    assigns =
-      Map.merge(assigns, %{
-        id: "exterm-row-#{assigns.row_index}",
-        total_columns: map_size(assigns.row)
-      })
+    number = number(assigns.row)
+    assigns = Map.put(assigns, :id, "exterm-row-#{number}")
 
     ~H"""
-    <div id={@id}, class="exterm-row">
-      <%= for column_index <- 1..@total_columns do %><Cell.render
-        row_index={@row_index}
-        column_index={column_index}
-        cell={@row[column_index]}
-        cursor={@cursor}
-        prompt={@prompt}
-      /><% end %>
+    <div id={@id} class="exterm-row">
+      <%= for cell <- @row do %>
+      <Cell.render cell={cell} cursor={@cursor} prompt={@prompt}/>
+      <% end %>
     </div>
     """
   end
+
+  def number([cell | _]), do: number(cell)
+  def number({{row, _}, _}), do: row
 end

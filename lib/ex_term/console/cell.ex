@@ -8,24 +8,20 @@ defmodule ExTerm.Console.Cell do
   @type t :: %__MODULE__{style: Style.t(), char: nil | String.t()}
   def new, do: %__MODULE__{}
 
-  def render(assigns) do
-    assigns =
-      Map.merge(assigns, %{
-        id: "exterm-cell-#{assigns.row_index}-#{assigns.column_index}",
-        classes: ["exterm-cell" | maybe_cursor(assigns)]
-      })
+  def render(%{cell: {rc = {row, column}, cell}, cursor: cursor, prompt: prompt}) do
+    cursor_style =
+      case {cursor, prompt} do
+        {^rc, true} -> ["exterm-cursor ", "exterm-cursor-active "]
+        {^rc, false} -> ["exterm-cursor "]
+        _ -> []
+      end
+
+    assigns = %{
+      id: "exterm-cell-#{row}-#{column}",
+      classes: ["exterm-cell " | cursor_style],
+      cell: cell
+    }
 
     ~H(<div id={@id} class={@classes} style={@cell.style}><%= @cell.char %></div>)
   end
-
-  defp maybe_cursor(%{
-         cursor: %{row: row, column: column},
-         row_index: row,
-         column_index: column,
-         prompt: prompt
-       }) do
-    [" exterm-cursor" | List.wrap(if prompt, do: " exterm-cursor-active")]
-  end
-
-  defp maybe_cursor(_), do: []
 end

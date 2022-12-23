@@ -13,12 +13,16 @@ defmodule IEx.Server.Relay do
   def pid do
     receive do
       {:relay_pid, relay} -> relay
+    after
+      1000 -> raise "timed out on pid"
     end
   end
 
   def fetch(relay_pid) do
     receive do
       {:relay, ^relay_pid, response} -> response
+    after
+      1000 -> raise "timed out on fetch"
     end
   end
 
@@ -29,6 +33,8 @@ defmodule IEx.Server.Relay do
 
       io_reply = {:io_reply, _, _} ->
         send(target, io_reply)
+    after
+      1000 -> raise "timed out on do_relay"
     end
 
     do_relay(target)
