@@ -34,7 +34,7 @@ defmodule IEx.Server.Relay do
       io_reply = {:io_reply, _, _} ->
         send(target, io_reply)
     after
-      1000 -> raise "timed out on do_relay"
+      10000 -> raise "timed out on do_relay"
     end
 
     do_relay(target)

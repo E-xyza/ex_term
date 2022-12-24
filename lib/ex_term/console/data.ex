@@ -126,7 +126,7 @@ defmodule ExTerm.Console.Data do
     [columns, cursor, style] = metadata(table, [:columns, :cursor, :style])
 
     :ets.insert(table, [
-      {cursor, %Cell{style: style, char: char}} | advance_cursor(cursor, columns)
+      {cursor, %Cell{style: style, char: char}} | cursor_advance(cursor, columns)
     ])
 
     table
@@ -176,7 +176,7 @@ defmodule ExTerm.Console.Data do
   #######################################################################
   ## TOOLS
 
-  defp advance_cursor({row, column}, columns) do
+  def cursor_advance({row, column}, columns) do
     [{:cursor, adjust_cursor({row, column + 1}, columns)}]
   end
 

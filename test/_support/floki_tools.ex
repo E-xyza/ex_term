@@ -2,10 +2,9 @@ defmodule ExTermTest.FlokiTools do
   alias ExTerm.Style
 
   def dump(content) do
-    content =
-      content
-      |> Floki.find("#exterm-console")
-      |> Floki.text()
+    content
+    |> Floki.find("#exterm-console")
+    |> Floki.text()
   end
 
   def line_to_text(content, number) do

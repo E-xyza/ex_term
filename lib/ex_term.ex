@@ -114,8 +114,31 @@ defmodule ExTerm do
     {:noreply, new_socket}
   end
 
-  defp get_line_impl(from, prompt, socket) do
-    Console.start_prompt(from, socket.assigns.console, prompt)
+  defp get_line_impl(
+         from,
+         prompt,
+         socket = %{assigns: %{console: console, key_buffer: key_buffer}}
+       ) do
+    socket =
+      key_buffer
+      |> IO.iodata_to_binary()
+      |> String.split("\n", parts: 2, trim: true)
+      |> case do
+        [] ->
+          Console.start_prompt(from, console, prompt)
+          socket
+
+        [first | rest] ->
+          Console.put_chars(console, prompt <> first)
+
+          Data.transactionalize(console, fn ->
+            Console.cursor_crlf(console)
+          end)
+
+          reply(from, first)
+          set_key_buffer(socket, rest)
+      end
+
     {:noreply, repaint(socket)}
   end
 
@@ -130,12 +153,15 @@ defmodule ExTerm do
   @ignores ~w(Shift Alt Control)
 
   defp enter_impl(socket = %{assigns: %{console: console, key_buffer: key_buffer}}) do
-    Console.register_input(console, key_buffer)
-
     new_socket =
-      socket
-      |> repaint()
-      |> set_key_buffer()
+      if Console.register_input(console, key_buffer) do
+        socket
+        |> repaint()
+        |> set_key_buffer()
+      else
+        # nb using ++ syntax to avoid cons dialyzer warning
+        set_key_buffer(socket, [key_buffer] ++ "\n")
+      end
 
     {:noreply, new_socket}
   end
@@ -146,7 +172,8 @@ defmodule ExTerm do
     new_socket =
       socket
       |> repaint()
-      |> set_key_buffer([socket.assigns.key_buffer, key])
+      # nb using ++ syntax to avoid cons dialyzer warning
+      |> set_key_buffer([socket.assigns.key_buffer] ++ key)
 
     {:noreply, new_socket}
   end

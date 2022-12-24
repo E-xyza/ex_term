@@ -10,13 +10,9 @@ defmodule ExTerm.Console do
 
   use Phoenix.Component
 
-  alias ExTerm.Buffer
   alias ExTerm.Console.Row
   alias ExTerm.Console.Data
   alias ExTerm.Style
-
-  @default_row_count 40
-  @default_column_count 80
 
   @type t :: :ets.table()
   @type rows :: %{optional(pos_integer) => Row.t()}
@@ -67,7 +63,7 @@ defmodule ExTerm.Console do
 
   def push_key(console, key) do
     Data.transactionalize(console, fn ->
-      if prompt = Data.metadata(console, :prompt) do
+      if Data.metadata(console, :prompt) do
         do_put_char(console, key)
       else
         false
@@ -116,6 +112,6 @@ defmodule ExTerm.Console do
     Data.put_char(console, char)
   end
 
-  defdelegate cursor_advance(console), to: Data
+  defdelegate cursor_advance(console, columns), to: Data
   defdelegate cursor_crlf(console), to: Data
 end

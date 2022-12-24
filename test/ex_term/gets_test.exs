@@ -56,5 +56,18 @@ defmodule ExTermTest.GetsTest do
 
       assert "a" == Task.await(future)
     end
+
+    test "it is possible to queue up content", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/")
+      relay_pid = Relay.pid()
+
+      push_key(view, "a")
+      push_key(view, "Enter")
+      push_key(view, "b")
+      push_key(view, "Enter")
+
+      assert "a" = IO.gets(relay_pid, "prompt")
+      assert "b" = IO.gets(relay_pid, "prompt")
+    end
   end
 end
