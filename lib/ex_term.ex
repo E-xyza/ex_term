@@ -27,6 +27,7 @@ defmodule ExTerm do
     new_socket =
       socket
       |> set_tty
+      |> set_modifiers
       |> set_buffer
       |> set_console(if connected?(socket), do: Data.new())
       |> set_focus
@@ -53,6 +54,15 @@ defmodule ExTerm do
   defp set_buffer(socket, buffer \\ %Buffer{}), do: assign(socket, buffer: buffer)
   defp set_console(socket, console), do: assign(socket, console: console, rows: [], cursor: nil)
   defp set_focus(socket, focus \\ false), do: assign(socket, focus: focus)
+
+  defp set_modifiers(socket, modifier \\ nil) do
+    if modifier do
+      {key, bool} = modifier
+      assign(socket, modifiers: Map.put(socket.assigns.modifiers, key, bool))
+    else
+      assign(socket, modifiers: %{})
+    end
+  end
 
   defp set_prompt(socket, prompt \\ %Prompt{}, opts \\ []) do
     if opts[:repaint] do
@@ -173,7 +183,13 @@ defmodule ExTerm do
 
   defp delete_impl(socket), do: change_prompt(socket, &Prompt.delete/1)
 
-  defp key_impl(key, socket), do: change_prompt(socket, &Prompt.push_key(&1, key))
+  defp key_impl(key, socket) do
+    if Enum.any?(socket.assigns.modifiers, &elem(&1, 1)) do
+      {:noreply, socket}
+    else
+      change_prompt(socket, &Prompt.push_key(&1, key))
+    end
+  end
 
   defp arrow_impl(:left, socket), do: change_prompt(socket, &Prompt.left/1)
 
@@ -183,9 +199,24 @@ defmodule ExTerm do
     {:noreply, socket}
   end
 
+  # Shift is not a modifier because it actually changes the ascii character
+  # that Javascript sends down onkeydown.
+  @modifiers ~w(Alt Control)
+
+  defp modifier_dn_impl(key, socket) do
+    {:noreply, set_modifiers(socket, {key, true})}
+  end
+
+  defp modifier_up_impl(key, socket) do
+    {:noreply, set_modifiers(socket, {key, false})}
+  end
+
+  @silent ~w(PageDown PageUp Shift)
 
   defp ignore_impl(ignored, socket) do
-    IO.warn("got #{ignored}")
+    unless ignored in @silent do
+      IO.warn("got #{ignored}")
+    end
     {:noreply, socket}
   end
 
@@ -193,9 +224,10 @@ defmodule ExTerm do
   ## Common functions
 
   defp change_prompt(socket = %{assigns: %{prompt: prompt}}, lambda) do
-    new_socket = socket
-    |> set_prompt(lambda.(prompt), repaint: Prompt.active?(prompt))
-    |> repaint
+    new_socket =
+      socket
+      |> set_prompt(lambda.(prompt), repaint: Prompt.active?(prompt))
+      |> repaint
 
     {:noreply, new_socket}
   end
@@ -227,11 +259,15 @@ defmodule ExTerm do
   defp handle_keydown("ArrowUp", socket), do: arrow_impl(:up, socket)
   defp handle_keydown("ArrowDown", socket), do: arrow_impl(:down, socket)
   defp handle_keydown(key = <<_>>, socket), do: key_impl(key, socket)
+  defp handle_keydown(key, socket) when key in @modifiers, do: modifier_dn_impl(key, socket)
   defp handle_keydown(ignored, socket), do: ignore_impl(ignored, socket)
+
+  defp handle_keyup(key, socket) when key in @modifiers, do: modifier_up_impl(key, socket)
 
   def handle_event("focus", payload, socket), do: focus_impl(payload, socket)
   def handle_event("blur", payload, socket), do: blur_impl(payload, socket)
   def handle_event("keydown", %{"key" => key}, socket), do: handle_keydown(key, socket)
+  def handle_event("keyup", %{"key" => key}, socket), do: handle_keyup(key, socket)
 
   def handle_event(type, payload, socket) do
     IO.warn("unhandled event of type #{type} (#{Jason.encode!(payload)})")

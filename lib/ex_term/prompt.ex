@@ -64,8 +64,7 @@ defmodule ExTerm.Prompt do
     pad_blank(%{
       prompt
       | cursor_offset: prompt.cursor_offset - 1,
-        precursor: tl(prompt.precursor),
-        postcursor: [prompt.postcursor]
+        precursor: tl(prompt.precursor)
     })
   end
 
