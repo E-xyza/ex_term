@@ -69,5 +69,23 @@ defmodule ExTermTest.GetsTest do
       assert "a" = IO.gets(relay_pid, "prompt")
       assert "b" = IO.gets(relay_pid, "prompt")
     end
+
+    test "backspace key can delete content out of the active buffer", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/")
+      relay_pid = Relay.pid()
+
+      future =
+        Task.async(fn ->
+          IO.gets(relay_pid, "prompt")
+        end)
+
+      push_key(view, "a")
+      doc = push_key(view, "Backspace")
+      refute "a" == FlokiTools.char_at(doc, 1, 7)
+      assert {1, 7} = FlokiTools.cursor_location(doc)
+
+      doc = push_key(view, "Enter")
+      assert "" = future
+    end
   end
 end

@@ -45,9 +45,7 @@ defmodule ExTermTest.DataTest do
     end
 
     defp do_crlf(table) do
-      Data.transactionalize(table, fn ->
-        Data.cursor_crlf(table)
-      end)
+      Data.cursor_crlf(table)
     end
 
     test "moves the cursor down one row", %{table: table} do
@@ -67,6 +65,17 @@ defmodule ExTermTest.DataTest do
       assert {5, 1} = Data.metadata(table, :cursor)
       assert 5 == Data.last_row(table)
       assert [[{{5, 1}, _}, {{5, 2}, _}, {{5, 3}, _}, {{5, 4}, _}]] = Data.get_rows(table, 5, 4)
+    end
+  end
+
+  describe "paint_chars" do
+    test "can start painting characters" do
+      table = Data.new(rows: 4, columns: 10)
+      Data.paint_chars(table, {2, 2}, "foo bar", 3)
+
+      assert {2, 5} = Data.metadata(table, :cursor)
+      assert 2 == Data.last_row(table)
+      assert [[{{2, 1}, nil}, {{2, 2}, %{char: "f"}} | _]] = Data.get_rows(table, 2, 7)
     end
   end
 end

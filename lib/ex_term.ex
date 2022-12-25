@@ -3,6 +3,7 @@ defmodule ExTerm do
   alias ExTerm.Console
   # TODO: move all Data access to defdelegate from Console.
   alias ExTerm.Console.Data
+  alias ExTerm.Prompt
   alias ExTerm.Tty
 
   use Phoenix.LiveView
@@ -30,7 +31,6 @@ defmodule ExTerm do
       |> set_console(if connected?(socket), do: Data.new())
       |> set_focus
       |> set_prompt
-      |> set_key_buffer
       |> repaint
 
     {:ok, new_socket, temporary_assigns: [buffer_lines: []]}
@@ -53,8 +53,13 @@ defmodule ExTerm do
   defp set_buffer(socket, buffer \\ %Buffer{}), do: assign(socket, buffer: buffer)
   defp set_console(socket, console), do: assign(socket, console: console, rows: [], cursor: nil)
   defp set_focus(socket, focus \\ false), do: assign(socket, focus: focus)
-  defp set_prompt(socket, prompting \\ false), do: assign(socket, prompt: prompting)
-  defp set_key_buffer(socket, buffer \\ []), do: assign(socket, key_buffer: buffer)
+
+  defp set_prompt(socket, prompt \\ %Prompt{}, opts \\ []) do
+    if opts[:repaint] do
+      Prompt.paint(prompt, &Console.paint_chars(socket.assigns.console, &1, &2, &3))
+    end
+    assign(socket, prompt: prompt)
+  end
 
   defp push_buffer_lines(socket, lines), do: assign(socket, buffer_lines: lines)
 
@@ -80,14 +85,14 @@ defmodule ExTerm do
   defp repaint(socket) do
     new_socket = %{assigns: %{console: console}} = adjust_buffer(socket)
 
-    {cursor, rows, prompt} =
+    {cursor, rows} =
       if console do
         Data.console(console)
       else
-        {nil, [], false}
+        {nil, []}
       end
 
-    assign(new_socket, rows: rows, cursor: cursor, prompt: prompt)
+    assign(new_socket, rows: rows, cursor: cursor)
   end
 
   #############################################################################
@@ -114,32 +119,32 @@ defmodule ExTerm do
     {:noreply, new_socket}
   end
 
-  defp get_line_impl(
-         from,
-         prompt,
-         socket = %{assigns: %{console: console, key_buffer: key_buffer}}
-       ) do
-    socket =
-      key_buffer
-      |> IO.iodata_to_binary()
-      |> String.split("\n", parts: 2, trim: true)
-      |> case do
-        [] ->
-          Console.start_prompt(from, console, prompt)
-          socket
+  defp get_line_impl(from, prompt_text, socket = %{assigns: %{prompt: prompt, console: console}}) do
+    # prompt contains "from" which is {ref, pid} if the prompt got activated
+    # and we are waiting for I/O.
+    # nil if there was content in the queue and it needs to be
+    # sent to I/O.
 
-        [first | rest] ->
-          Console.put_chars(console, prompt <> first)
+    # always send the prompt_text to the console first.
+    Console.put_chars(console, prompt_text)
+    location = Data.metadata(console, :cursor)
 
-          Data.transactionalize(console, fn ->
-            Console.cursor_crlf(console)
-          end)
+    prompt =
+      case Prompt.activate(prompt, from, location) do
+        {content, prompt = %Prompt{reply: nil}} ->
+          reply(from, content)
+          prompt
 
-          reply(from, first)
-          set_key_buffer(socket, rest)
+        {_, prompt} ->
+          prompt
       end
 
-    {:noreply, repaint(socket)}
+    new_socket =
+      socket
+      |> set_prompt(prompt, repaint: true)
+      |> repaint
+
+    {:noreply, new_socket}
   end
 
   defp get_geometry_impl(from, type, socket) do
@@ -150,35 +155,39 @@ defmodule ExTerm do
   #############################################################################
   ## KEYDOWN IMPLEMENTATIONS
 
-  @ignores ~w(Shift Alt Control)
-
-  defp enter_impl(socket = %{assigns: %{console: console, key_buffer: key_buffer}}) do
-    new_socket =
-      if Console.register_input(console, key_buffer) do
-        socket
-        |> repaint()
-        |> set_key_buffer()
-      else
-        # nb using ++ syntax to avoid cons dialyzer warning
-        set_key_buffer(socket, [key_buffer] ++ "\n")
-      end
-
-    {:noreply, new_socket}
-  end
-
-  defp key_impl(key, socket) do
-    Console.push_key(socket.assigns.console, key)
+  defp enter_impl(socket) do
+    new_prompt = Prompt.submit(socket.assigns.prompt, &reply/2)
 
     new_socket =
       socket
-      |> repaint()
-      # nb using ++ syntax to avoid cons dialyzer warning
-      |> set_key_buffer([socket.assigns.key_buffer] ++ key)
+      |> set_prompt(new_prompt, repaint: true)
+      |> repaint
 
     {:noreply, new_socket}
   end
 
-  defp ignore_impl(socket), do: {:noreply, socket}
+  defp backspace_impl(socket) do
+    {:noreply, socket}
+  end
+
+  defp arrow_impl(_direction, socket) do
+    {:noreply, socket}
+  end
+
+  defp key_impl(key, socket = %{assigns: %{prompt: prompt}}) do
+    new_prompt = Prompt.push_key(prompt, key)
+
+    new_socket = socket
+    |> set_prompt(new_prompt, repaint: Prompt.active?(prompt))
+    |> repaint
+
+    {:noreply, new_socket}
+  end
+
+  defp ignore_impl(ignored, socket) do
+    IO.warn("got #{ignored}")
+    {:noreply, socket}
+  end
 
   #############################################################################
   ## Common functions
@@ -203,8 +212,13 @@ defmodule ExTerm do
   end
 
   defp handle_keydown("Enter", socket), do: enter_impl(socket)
+  defp handle_keydown("Backspace", socket), do: backspace_impl(socket)
+  defp handle_keydown("ArrowLeft", socket), do: arrow_impl(:left, socket)
+  defp handle_keydown("ArrowRight", socket), do: arrow_impl(:right, socket)
+  defp handle_keydown("ArrowUp", socket), do: arrow_impl(:up, socket)
+  defp handle_keydown("ArrowDown", socket), do: arrow_impl(:down, socket)
   defp handle_keydown(key = <<_>>, socket), do: key_impl(key, socket)
-  defp handle_keydown(ignored, socket) when ignored in @ignores, do: ignore_impl(socket)
+  defp handle_keydown(ignored, socket), do: ignore_impl(ignored, socket)
 
   def handle_event("focus", payload, socket), do: focus_impl(payload, socket)
   def handle_event("blur", payload, socket), do: blur_impl(payload, socket)

@@ -34,9 +34,7 @@ defmodule ExTerm.Console do
   @spec get_dimension(t, dimension_request) :: non_neg_integer
 
   @spec put_chars(t, String.t()) :: t
-  @spec start_prompt(GenServer.from(), t, String.t()) :: t
   @spec push_key(t, String.t()) :: boolean
-  @spec register_input(t, iodata) :: boolean
 
   #############################################################################
   ## API IMPLEMENTATIONS
@@ -49,38 +47,11 @@ defmodule ExTerm.Console do
   end
 
   def put_chars(console, chars) do
-    Data.transactionalize(console, fn ->
-      do_put_char(console, chars)
-    end)
-  end
-
-  def start_prompt(from, console, prompt) do
-    Data.transactionalize(console, fn ->
-      Data.put_metadata(console, prompt: from)
-      do_put_char(console, prompt)
-    end)
+    do_put_char(console, chars)
   end
 
   def push_key(console, key) do
-    Data.transactionalize(console, fn ->
-      if Data.metadata(console, :prompt) do
-        do_put_char(console, key)
-      else
-        false
-      end
-    end)
-  end
-
-  def register_input(console, buffer) do
-    Data.transactionalize(console, fn ->
-      if prompt = Data.metadata(console, :prompt) do
-        ExTerm.reply(prompt, IO.iodata_to_binary(buffer))
-        cursor_crlf(console)
-        true
-      else
-        false
-      end
-    end)
+    do_put_char(console, key)
   end
 
   #############################################################################
@@ -114,4 +85,5 @@ defmodule ExTerm.Console do
 
   defdelegate cursor_advance(console, columns), to: Data
   defdelegate cursor_crlf(console), to: Data
+  defdelegate paint_chars(console, location, content, cursor_offset), to: Data
 end

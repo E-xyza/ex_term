@@ -1,9 +1,10 @@
 defmodule ExTerm.Console.Data do
+  @moduledoc false
   alias ExTerm.Style
   alias ExTerm.Console.Cell
   alias ExTerm.Console.Row
 
-  @defaults [rows: 40, columns: 80, style: Style.new(), cursor: {1, 1}, prompt: false]
+  @defaults [rows: 40, columns: 80, style: Style.new(), cursor: {1, 1}]
   @type coordinate :: {non_neg_integer, non_neg_integer}
   @type rows :: [[{coordinate, Cell.t()}]]
 
@@ -80,7 +81,7 @@ defmodule ExTerm.Console.Data do
   defp metadata_key_query(key) when is_atom(key),
     do: [{{@key, @value}, [{:"=:=", @key, key}], [@value]}]
 
-  @spec console(:ets.table()) :: {cursor :: coordinate, rows, prompting :: boolean}
+  @spec console(:ets.table()) :: {cursor :: coordinate, rows}
   @doc """
   fetches the console region of the table.
 
@@ -90,10 +91,10 @@ defmodule ExTerm.Console.Data do
   # so this code might need to be revisited.
   def console(table) do
     # note that the keys here are in erlang term order.
-    [columns, cursor, prompt, rows] = metadata(table, [:columns, :cursor, :prompt, :rows])
+    [columns, cursor, rows] = metadata(table, [:columns, :cursor, :rows])
     last_row = last_row(table)
     first_row = last_row - rows + 1
-    {cursor, get_rows(table, first_row..last_row, columns), !!prompt}
+    {cursor, get_rows(table, first_row..last_row, columns)}
   end
 
   # generic row fetching
@@ -122,7 +123,6 @@ defmodule ExTerm.Console.Data do
   puts a character, in the current style at the expected place.
   """
   def put_char(table, char) do
-    assert_in_transaction!()
     [columns, cursor, style] = metadata(table, [:columns, :cursor, :style])
 
     :ets.insert(table, [
@@ -136,7 +136,6 @@ defmodule ExTerm.Console.Data do
   performs a crlf operation on the cursor.
   """
   def cursor_crlf(table) do
-    assert_in_transaction!()
     [columns, {row, _}] = metadata(table, [:columns, :cursor])
     last_row = last_row(table)
     new_row = row + 1
@@ -161,6 +160,8 @@ defmodule ExTerm.Console.Data do
   end
 
   @doc """
+  calculates `buffer shift`, which is how many lines you need to move from
+  a fixed console section to the buffer.
   """
   def buffer_shift(table, top_console_row) do
     [columns, rows] = metadata(table, [:columns, :rows])
@@ -173,6 +174,61 @@ defmodule ExTerm.Console.Data do
     end
   end
 
+  @doc """
+  sends a string to the console at a position, resetting the cursor to a
+  place within the string or at its end.
+
+  If it's a binary, it must be unicode-encoded, with no ANSI control
+  characters.  Style is set by the current style of the
+
+  If it's a list, it must be a list of either single characters or
+  style structs.  If it's a style struct, then it replaces the current
+  style of the console with the new style.
+  """
+  def paint_chars(_table, nil, _content, _cursor_offset), do: :ok
+
+  def paint_chars(table, location, content, cursor_offset) do
+    [columns, style] = metadata(table, [:columns, :style])
+    do_paint_chars(table, location, content, cursor_offset, columns, style)
+  end
+
+  defp do_paint_chars(table, {row, column}, content, cursor_offset, columns, style) when is_binary(content) do
+    case String.next_grapheme(content) do
+      {grapheme, rest} ->
+        next_location = adjust_cursor({row, column + 1}, columns)
+
+        table
+        |> put_char_with({row, column}, grapheme, style)
+        |> maybe_paint_row(next_location, columns)
+        |> do_paint_chars(next_location, rest, decrement_or_tuple(cursor_offset, {row, column}), columns, style)
+      nil when cursor_offset == 1 ->
+        put_metadata(table, cursor_advance({row, column}, columns))
+      nil when cursor_offset == 0 or is_tuple(cursor_offset) ->
+        put_metadata(table, cursor: cursor_offset)
+    end
+  end
+
+  defp do_paint_chars(table, _, [], cursor_tuple, _, _) do
+    put_metadata(table, cursor: cursor_tuple)
+  end
+
+  defp do_paint_chars(table, {row, column}, [grapheme | rest], cursor_offset, columns, style) when is_binary(grapheme) do
+    next_location = adjust_cursor({row, column + 1}, columns)
+
+    table
+    |> put_char_with({row, column}, grapheme, style)
+    |> maybe_paint_row(next_location, columns)
+    |> do_paint_chars(next_location, rest, decrement_or_tuple(cursor_offset, {row, column}), columns, style)
+  end
+
+  defp do_paint_chars(table, location, [style = %Style{} | rest], cursor_offset, columns, _) do
+    do_paint_chars(table, location, rest, cursor_offset, columns, style)
+  end
+
+  defp decrement_or_tuple(0, tuple), do: tuple
+  defp decrement_or_tuple(count, _) when is_integer(count), do: count - 1
+  defp decrement_or_tuple(tuple, _) when is_tuple(tuple), do: tuple
+
   #######################################################################
   ## TOOLS
 
@@ -184,57 +240,18 @@ defmodule ExTerm.Console.Data do
 
   defp adjust_cursor(cursor, _), do: cursor
 
-  @spec transactionalize(:ets.table(), (() -> any)) :: any
-  # this might be a terrible idea.  Consider using atomics, or wrapping the ets table
-  # into a gen_server.
-  def transactionalize(table, action) do
-    transaction_lock = make_ref()
-
-    if :ets.insert_new(table, {:transaction, transaction_lock}) do
-      Process.put(:exterm_transaction, transaction_lock)
-      result = action.()
-      notify_waiters(table)
-      :ets.delete(table, :transaction)
-      Process.delete(:exterm_transaction)
-      result
-    else
-      :ets.insert(table, {transaction_lock, self()})
-      wait_for(transaction_lock)
-      transactionalize(table, action)
-    end
-  end
-
-  @compile {:inline, assert_in_transaction!: 0}
-  defp assert_in_transaction!,
-    do: Process.get(:exterm_transaction) || raise("this function needs to be in a transaction")
-
-  defp notify_waiters(table) do
+  defp put_char_with(table, location, grapheme, style) do
+    :ets.insert(table, {location, %Cell{char: grapheme, style: style}})
     table
-    |> :ets.select([{{@key, @value}, [{:is_reference, @key}], [{{@key, @value}}]}])
-    |> Enum.each(fn {transaction_lock, pid} -> send(pid, {:exterm_release, transaction_lock}) end)
-
-    :ets.select_delete(table, [{{@key, @value}, [{:is_reference, @key}], [true]}])
   end
 
-  defp wait_for(transaction_lock) do
-    receive do
-      {:exterm_release, ^transaction_lock} ->
-        :ok
-    after
-      10 ->
-        :ok
+  defp maybe_paint_row(table, {row, _}, columns) do
+    if last_row(table) < row do
+      :ets.insert(table, for column <- 1..columns do
+        {{row, column}, %Cell{}}
+      end)
     end
-
-    flush_releases()
-  end
-
-  defp flush_releases do
-    receive do
-      {:exterm_release, _} -> flush_releases()
-    after
-      0 ->
-        :ok
-    end
+    table
   end
 
   def dump(table) do
