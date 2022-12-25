@@ -156,10 +156,9 @@ defmodule ExTerm do
   #############################################################################
   ## KEYDOWN IMPLEMENTATIONS
 
-  defp enter_impl(socket! = %{assigns: %{prompt: prompt, console: console}}) do
+  defp enter_impl(socket = %{assigns: %{prompt: prompt, console: console}}) do
     new_prompt = Prompt.submit(prompt, &reply/2)
-
-    socket! = set_prompt(socket!, new_prompt, repaint: true)
+    new_socket = set_prompt(socket, new_prompt, repaint: true)
 
     # if it's not active, then only trap the enter, but don't change
     # the console contents.
@@ -167,13 +166,16 @@ defmodule ExTerm do
       Console.cursor_crlf(console)
     end
 
-    socket! = repaint(socket!)
-
-    {:noreply, socket!}
+    {:noreply, repaint(new_socket)}
   end
 
   defp backspace_impl(socket) do
-    {:noreply, socket}
+    new_socket =
+      socket
+      |> set_prompt(Prompt.backspace(socket.assigns.prompt), repaint: true)
+      |> repaint
+
+    {:noreply, new_socket}
   end
 
   defp arrow_impl(_direction, socket) do

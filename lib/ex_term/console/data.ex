@@ -195,7 +195,6 @@ defmodule ExTerm.Console.Data do
 
   defp do_paint_chars(table, {row, column}, content, cursor_offset, columns, style)
        when is_binary(content) do
-
     case String.next_grapheme(content) do
       {grapheme, rest} ->
         next_location = adjust_cursor({row, column + 1}, columns)

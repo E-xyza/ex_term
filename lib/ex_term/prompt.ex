@@ -8,7 +8,8 @@ defmodule ExTerm.Prompt do
     cursor_offset: 0,
     precursor: [],
     postcursor: [],
-    entry_buffer: :queue.new()
+    entry_buffer: :queue.new(),
+    trailing_blanks: 0
   ]
 
   @type reply :: {reference, pid}
@@ -54,12 +55,24 @@ defmodule ExTerm.Prompt do
         %{prompt | entry_buffer: new_entry_buffer}
       end
 
-    # clear all bits of the prompt
-    %{new_prompt | cursor_offset: 0, precursor: [], postcursor: [], reply: nil}
+    reset(new_prompt)
   end
 
+  def backspace(prompt = %{precursor: []}), do: prompt
+
   def backspace(prompt) do
-    %{prompt | cursor_offset: prompt.cursor_offset - 1, precursor: tl(prompt.precursor)}
+    pad_blank(%{
+      prompt
+      | cursor_offset: prompt.cursor_offset - 1,
+        precursor: tl(prompt.precursor),
+        postcursor: [prompt.postcursor]
+    })
+  end
+
+  def delete(prompt = %{postcursor: []}), do: prompt
+
+  def delete(prompt) do
+    pad_blank(%{prompt | postcursor: tl(prompt.postcursor)})
   end
 
   def left(prompt) do
@@ -96,15 +109,24 @@ defmodule ExTerm.Prompt do
           (start_location :: location, String.t(), cursor_offset :: non_neg_integer -> any)
   @spec paint(t, painter) :: :ok
   def paint(prompt, function) do
-    function.(prompt.location, to_binary(prompt), prompt.cursor_offset)
+    content = to_binary(prompt, List.duplicate(" ", prompt.trailing_blanks))
+    function.(prompt.location, content, prompt.cursor_offset)
     :ok
   end
 
   def active?(prompt), do: !!prompt.reply
 
-  defp to_binary(prompt) do
+  defp to_binary(prompt, padding \\ []) do
     prompt.precursor
-    |> Enum.reverse(prompt.postcursor)
+    |> Enum.reverse([prompt.postcursor | padding])
     |> IO.iodata_to_binary()
+  end
+
+  defp pad_blank(prompt) do
+    %{prompt | trailing_blanks: prompt.trailing_blanks + 1}
+  end
+
+  defp reset(prompt) do
+    %{prompt | cursor_offset: 0, precursor: [], postcursor: [], reply: nil, trailing_blanks: 0}
   end
 end
