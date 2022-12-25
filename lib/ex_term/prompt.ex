@@ -44,7 +44,7 @@ defmodule ExTerm.Prompt do
     new_prompt =
       if reply = prompt.reply do
         replyfn.(reply, to_binary(prompt))
-        %{prompt | reply: nil}
+        prompt
       else
         new_entry_buffer =
           prompt

@@ -58,6 +58,7 @@ defmodule ExTerm do
     if opts[:repaint] do
       Prompt.paint(prompt, &Console.paint_chars(socket.assigns.console, &1, &2, &3))
     end
+
     assign(socket, prompt: prompt)
   end
 
@@ -155,15 +156,20 @@ defmodule ExTerm do
   #############################################################################
   ## KEYDOWN IMPLEMENTATIONS
 
-  defp enter_impl(socket) do
-    new_prompt = Prompt.submit(socket.assigns.prompt, &reply/2)
+  defp enter_impl(socket! = %{assigns: %{prompt: prompt, console: console}}) do
+    new_prompt = Prompt.submit(prompt, &reply/2)
 
-    new_socket =
-      socket
-      |> set_prompt(new_prompt, repaint: true)
-      |> repaint
+    socket! = set_prompt(socket!, new_prompt, repaint: true)
 
-    {:noreply, new_socket}
+    # if it's not active, then only trap the enter, but don't change
+    # the console contents.
+    if Prompt.active?(prompt) do
+      Console.cursor_crlf(console)
+    end
+
+    socket! = repaint(socket!)
+
+    {:noreply, socket!}
   end
 
   defp backspace_impl(socket) do
@@ -177,9 +183,10 @@ defmodule ExTerm do
   defp key_impl(key, socket = %{assigns: %{prompt: prompt}}) do
     new_prompt = Prompt.push_key(prompt, key)
 
-    new_socket = socket
-    |> set_prompt(new_prompt, repaint: Prompt.active?(prompt))
-    |> repaint
+    new_socket =
+      socket
+      |> set_prompt(new_prompt, repaint: Prompt.active?(prompt))
+      |> repaint
 
     {:noreply, new_socket}
   end

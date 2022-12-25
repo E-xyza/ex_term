@@ -69,7 +69,7 @@ defmodule ExTermTest.DataTest do
   end
 
   describe "paint_chars" do
-    test "can start painting characters" do
+    test "paints characters and resets cursor" do
       table = Data.new(rows: 2, columns: 10)
       Data.paint_chars(table, {2, 2}, "foo bar", 3)
 

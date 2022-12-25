@@ -41,6 +41,7 @@ defmodule ExTermTest.PutsTest do
 
       assert "test1" = FlokiTools.line_to_text(doc, 1)
       assert "test2" = FlokiTools.line_to_text(doc, 2)
+
       assert {3, 1} = FlokiTools.cursor_location(doc)
     end
 

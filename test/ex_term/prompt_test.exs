@@ -3,6 +3,10 @@ defmodule ExTermTest.PromptTest do
 
   alias ExTerm.Prompt
 
+  defp do_send({ref, pid}, binary) do
+    send(pid, {:ok, ref, binary})
+  end
+
   describe "when a reply is not active" do
     test "adding a keystrokes put them in the key buffer, in reverse order" do
       assert %{precursor: ["a"], cursor_offset: 1} = Prompt.push_key(%Prompt{}, "a")
@@ -18,10 +22,10 @@ defmodule ExTermTest.PromptTest do
                %Prompt{}
                |> Prompt.push_key("a")
                |> Prompt.push_key("b")
-               |> Prompt.submit()
+               |> Prompt.submit(&do_send/2)
                |> Prompt.push_key("c")
                |> Prompt.push_key("d")
-               |> Prompt.submit()
+               |> Prompt.submit(&do_send/2)
                |> Prompt.push_key("e")
                |> Prompt.push_key("f")
 
@@ -57,19 +61,18 @@ defmodule ExTermTest.PromptTest do
   end
 
   describe "when a reply is active" do
-    defp do_send({ref, pid}, binary) do
-      send(pid, {:ok, ref, binary})
-    end
-
     test "hitting enter triggers a send via the send function" do
       ref = make_ref()
 
       assert %{precursor: [], postcursor: [], reply: nil} =
-               Prompt.submit(%Prompt{
-                 reply: {ref, self()},
-                 precursor: ["a"],
-                 postcursor: ["b"]
-               }, &do_send/2)
+               Prompt.submit(
+                 %Prompt{
+                   reply: {ref, self()},
+                   precursor: ["a"],
+                   postcursor: ["b"]
+                 },
+                 &do_send/2
+               )
 
       assert_receive {:ok, ^ref, "ab"}
     end

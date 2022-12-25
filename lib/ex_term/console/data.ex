@@ -137,6 +137,7 @@ defmodule ExTerm.Console.Data do
   """
   def cursor_crlf(table) do
     [columns, {row, _}] = metadata(table, [:columns, :cursor])
+
     last_row = last_row(table)
     new_row = row + 1
     :ets.insert(table, {:cursor, {new_row, 1}})
@@ -192,7 +193,9 @@ defmodule ExTerm.Console.Data do
     do_paint_chars(table, location, content, cursor_offset, columns, style)
   end
 
-  defp do_paint_chars(table, {row, column}, content, cursor_offset, columns, style) when is_binary(content) do
+  defp do_paint_chars(table, {row, column}, content, cursor_offset, columns, style)
+       when is_binary(content) do
+
     case String.next_grapheme(content) do
       {grapheme, rest} ->
         next_location = adjust_cursor({row, column + 1}, columns)
@@ -200,10 +203,21 @@ defmodule ExTerm.Console.Data do
         table
         |> put_char_with({row, column}, grapheme, style)
         |> maybe_paint_row(next_location, columns)
-        |> do_paint_chars(next_location, rest, decrement_or_tuple(cursor_offset, {row, column}), columns, style)
+        |> do_paint_chars(
+          next_location,
+          rest,
+          decrement_or_tuple(cursor_offset, {row, column}),
+          columns,
+          style
+        )
+
       nil when cursor_offset == 1 ->
         put_metadata(table, cursor_advance({row, column}, columns))
-      nil when cursor_offset == 0 or is_tuple(cursor_offset) ->
+
+      nil when cursor_offset == 0 ->
+        put_metadata(table, cursor: {row, column})
+
+      nil when is_tuple(cursor_offset) ->
         put_metadata(table, cursor: cursor_offset)
     end
   end
@@ -212,13 +226,20 @@ defmodule ExTerm.Console.Data do
     put_metadata(table, cursor: cursor_tuple)
   end
 
-  defp do_paint_chars(table, {row, column}, [grapheme | rest], cursor_offset, columns, style) when is_binary(grapheme) do
+  defp do_paint_chars(table, {row, column}, [grapheme | rest], cursor_offset, columns, style)
+       when is_binary(grapheme) do
     next_location = adjust_cursor({row, column + 1}, columns)
 
     table
     |> put_char_with({row, column}, grapheme, style)
     |> maybe_paint_row(next_location, columns)
-    |> do_paint_chars(next_location, rest, decrement_or_tuple(cursor_offset, {row, column}), columns, style)
+    |> do_paint_chars(
+      next_location,
+      rest,
+      decrement_or_tuple(cursor_offset, {row, column}),
+      columns,
+      style
+    )
   end
 
   defp do_paint_chars(table, location, [style = %Style{} | rest], cursor_offset, columns, _) do
@@ -247,10 +268,14 @@ defmodule ExTerm.Console.Data do
 
   defp maybe_paint_row(table, {row, _}, columns) do
     if last_row(table) < row do
-      :ets.insert(table, for column <- 1..columns do
-        {{row, column}, %Cell{}}
-      end)
+      :ets.insert(
+        table,
+        for column <- 1..columns do
+          {{row, column}, %Cell{}}
+        end
+      )
     end
+
     table
   end
 

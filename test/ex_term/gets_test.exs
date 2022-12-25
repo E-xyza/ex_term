@@ -86,6 +86,7 @@ defmodule ExTermTest.GetsTest do
 
       doc = push_key(view, "Enter")
       assert "" = future
+      assert {} = FlokiTools.cursor_location(doc)
     end
   end
 end

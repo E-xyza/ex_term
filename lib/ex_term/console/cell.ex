@@ -4,21 +4,29 @@ defmodule ExTerm.Console.Cell do
   use Phoenix.Component
 
   alias ExTerm.Style
+  alias ExTerm.Prompt
+
   defstruct style: Style.new(), char: nil
   @type t :: %__MODULE__{style: Style.t(), char: nil | String.t()}
   def new, do: %__MODULE__{}
 
   def render(%{cell: {rc = {row, column}, cell}, cursor: cursor, prompt: prompt}) do
     cursor_style =
-      case {cursor, prompt} do
-        {^rc, true} -> ["exterm-cursor ", "exterm-cursor-active "]
-        {^rc, false} -> ["exterm-cursor "]
-        _ -> []
-      end
+      List.wrap(
+        if prompt do
+          if cursor == rc do
+            if Prompt.active?(prompt) do
+              "exterm-cursor exterm-cursor-active"
+            else
+              "exterm-cursor"
+            end
+          end
+        end
+      )
 
     assigns = %{
       id: "exterm-cell-#{row}-#{column}",
-      classes: ["exterm-cell " | cursor_style],
+      classes: ["exterm-cell", " " | cursor_style],
       cell: cell
     }
 
