@@ -12,7 +12,7 @@ defmodule ExTermTest.DataTest do
 
     test "works to get all data", %{table: table} do
       # note the following KWL is ordered.
-      assert [columns: 80, cursor: {1, 1}, rows: 40, style: Style.new()] ==
+      assert [columns: 80, cursor: {1, 1}, rows: 24, style: Style.new()] ==
                Data.metadata(table)
     end
 
@@ -31,7 +31,7 @@ defmodule ExTermTest.DataTest do
       table = Data.new()
 
       expected =
-        for row <- 1..40 do
+        for row <- 1..24 do
           for column <- 1..80, do: {{row, column}, Cell.new()}
         end
 

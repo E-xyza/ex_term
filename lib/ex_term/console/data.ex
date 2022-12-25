@@ -4,7 +4,7 @@ defmodule ExTerm.Console.Data do
   alias ExTerm.Console.Cell
   alias ExTerm.Console.Row
 
-  @defaults [rows: 40, columns: 80, style: Style.new(), cursor: {1, 1}]
+  @defaults [rows: 24, columns: 80, style: Style.new(), cursor: {1, 1}]
   @type coordinate :: {non_neg_integer, non_neg_integer}
   @type rows :: [[{coordinate, Cell.t()}]]
 

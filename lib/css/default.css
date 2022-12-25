@@ -15,11 +15,24 @@ div#exterm-terminal {
     color: white;
     font-family: courier-new, courier, monospace;
     font-size: 15px;
-    width: 80ch;
-    height: 600px;
+    width: 100ch;
+    height: 500px;
+    position: relative;
+    overflow: auto;
 }
 
 div#exterm-container {
+    height: auto;
+    position: absolute;
+    bottom: 0px;
+}
+
+div#exterm-buffer {
+    position: absolute;
+    bottom: 480px;
+}
+
+div#exterm-console {
     position: absolute;
     bottom: 0px;
 }
@@ -35,14 +48,13 @@ div.exterm.exterm-focused div.exterm-cursor.exterm-cursor-active {
 }
 
 div.exterm-row {
-    width: 100%;
     display: flex;
 }
 
 div.exterm-cell {
     flex: 1;
     width: 1ch;
-    min-height: 15px;
+    height: 20px;
 }
 
 @keyframes blinker {

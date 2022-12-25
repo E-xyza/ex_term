@@ -21,7 +21,7 @@ defmodule ExTermTest.GeometryTest do
     test "you can get the rows", %{conn: conn} do
       {:ok, _view, _html} = live(conn, "/")
       ref = send_geometry_request(:rows)
-      assert_receive {:io_reply, ^ref, 40}
+      assert_receive {:io_reply, ^ref, 24}
     end
 
     test "you can get the columns", %{conn: conn} do
