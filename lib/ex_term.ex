@@ -12,8 +12,10 @@ defmodule ExTerm do
     ~H"""
     <div id="exterm-terminal" class={class_for(@focus)} phx-keydown="keydown" phx-focus="focus" phx-blur="blur" tabindex="0">
       <%= if @console do %>
-      <Buffer.render buffer={@buffer_lines}/>
-      <Console.render rows={@rows} cursor={@cursor} prompt={@prompt}/>
+      <div id="exterm-container">
+        <Buffer.render buffer={@buffer_lines}/>
+        <Console.render rows={@rows} cursor={@cursor} prompt={@prompt}/>
+      </div>
       <% end %>
     </div>
     """
