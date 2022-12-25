@@ -12,7 +12,7 @@ defmodule ExTermTest.DataTest do
 
     test "works to get all data", %{table: table} do
       # note the following KWL is ordered.
-      assert [columns: 80, cursor: {1, 1}, prompt: false, rows: 40, style: Style.new()] ==
+      assert [columns: 80, cursor: {1, 1}, rows: 40, style: Style.new()] ==
                Data.metadata(table)
     end
 
@@ -35,7 +35,7 @@ defmodule ExTermTest.DataTest do
           for column <- 1..80, do: {{row, column}, Cell.new()}
         end
 
-      assert {{1, 1}, expected, false} == Data.console(table)
+      assert {{1, 1}, expected} == Data.console(table)
     end
   end
 
@@ -70,12 +70,12 @@ defmodule ExTermTest.DataTest do
 
   describe "paint_chars" do
     test "can start painting characters" do
-      table = Data.new(rows: 4, columns: 10)
+      table = Data.new(rows: 2, columns: 10)
       Data.paint_chars(table, {2, 2}, "foo bar", 3)
 
       assert {2, 5} = Data.metadata(table, :cursor)
       assert 2 == Data.last_row(table)
-      assert [[{{2, 1}, nil}, {{2, 2}, %{char: "f"}} | _]] = Data.get_rows(table, 2, 7)
+      assert [[{{2, 1}, %{char: nil}}, {{2, 2}, %{char: "f"}} | _]] = Data.get_rows(table, 2, 7)
     end
   end
 end
