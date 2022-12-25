@@ -25,7 +25,7 @@ defmodule ExTerm.Prompt do
         }
 
   def push_key(prompt = %{precursor: precursor, cursor_offset: cursor_offset}, key) do
-    %{prompt | precursor: [key | precursor], cursor_offset: cursor_offset + 1}
+    unpad_blank(%{prompt | precursor: [key | precursor], cursor_offset: cursor_offset + 1})
   end
 
   @spec activate(t, reply, location) :: {nil | String.t(), t}
@@ -124,6 +124,12 @@ defmodule ExTerm.Prompt do
 
   defp pad_blank(prompt) do
     %{prompt | trailing_blanks: prompt.trailing_blanks + 1}
+  end
+
+  defp unpad_blank(prompt = %{trailing_blanks: 0}), do: prompt
+
+  defp unpad_blank(prompt) do
+    %{prompt | trailing_blanks: prompt.trailing_blanks - 1}
   end
 
   defp reset(prompt) do

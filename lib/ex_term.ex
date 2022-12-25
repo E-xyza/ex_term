@@ -169,29 +169,20 @@ defmodule ExTerm do
     {:noreply, repaint(new_socket)}
   end
 
-  defp backspace_impl(socket) do
-    new_socket =
-      socket
-      |> set_prompt(Prompt.backspace(socket.assigns.prompt), repaint: true)
-      |> repaint
+  defp backspace_impl(socket), do: change_prompt(socket, &Prompt.backspace/1)
 
-    {:noreply, new_socket}
-  end
+  defp delete_impl(socket), do: change_prompt(socket, &Prompt.delete/1)
+
+  defp key_impl(key, socket), do: change_prompt(socket, &Prompt.push_key(&1, key))
+
+  defp arrow_impl(:left, socket), do: change_prompt(socket, &Prompt.left/1)
+
+  defp arrow_impl(:right, socket), do: change_prompt(socket, &Prompt.right/1)
 
   defp arrow_impl(_direction, socket) do
     {:noreply, socket}
   end
 
-  defp key_impl(key, socket = %{assigns: %{prompt: prompt}}) do
-    new_prompt = Prompt.push_key(prompt, key)
-
-    new_socket =
-      socket
-      |> set_prompt(new_prompt, repaint: Prompt.active?(prompt))
-      |> repaint
-
-    {:noreply, new_socket}
-  end
 
   defp ignore_impl(ignored, socket) do
     IO.warn("got #{ignored}")
@@ -200,6 +191,14 @@ defmodule ExTerm do
 
   #############################################################################
   ## Common functions
+
+  defp change_prompt(socket = %{assigns: %{prompt: prompt}}, lambda) do
+    new_socket = socket
+    |> set_prompt(lambda.(prompt), repaint: Prompt.active?(prompt))
+    |> repaint
+
+    {:noreply, new_socket}
+  end
 
   def reply({pid, ref}, reply) do
     send(pid, {:io_reply, ref, reply})
@@ -222,6 +221,7 @@ defmodule ExTerm do
 
   defp handle_keydown("Enter", socket), do: enter_impl(socket)
   defp handle_keydown("Backspace", socket), do: backspace_impl(socket)
+  defp handle_keydown("Delete", socket), do: delete_impl(socket)
   defp handle_keydown("ArrowLeft", socket), do: arrow_impl(:left, socket)
   defp handle_keydown("ArrowRight", socket), do: arrow_impl(:right, socket)
   defp handle_keydown("ArrowUp", socket), do: arrow_impl(:up, socket)
