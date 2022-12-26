@@ -1,4 +1,5 @@
 defmodule ExTerm.Console.Row do
+  @moduledoc false
   use Phoenix.LiveComponent
 
   alias ExTerm.Console.Cell

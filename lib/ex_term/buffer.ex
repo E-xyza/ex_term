@@ -1,4 +1,5 @@
 defmodule ExTerm.Buffer do
+  @moduledoc false
   use Phoenix.LiveComponent
   alias ExTerm.Console.Row
 

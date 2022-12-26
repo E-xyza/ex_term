@@ -12,7 +12,15 @@ defmodule ExTerm.MixProject do
       compilers: Mix.compilers(),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(Mix.env()),
-      deps: deps()
+      deps: deps(),
+      description: "liveview terminal module",
+      package: package(),
+      source_url: "https://github.com/E-xyza/ex_term",
+      docs: [
+        main: "ExTerm",
+        extras: ["README.md"],
+        filter_modules: fn module, _ -> module == ExTerm end
+      ]
     ]
   end
 
@@ -44,7 +52,8 @@ defmodule ExTerm.MixProject do
       {:esbuild, "~> 0.4", runtime: Mix.env() == :dev},
       {:jason, "~> 1.2"},
       {:plug_cowboy, "~> 2.5", optional: !in_dev},
-      {:mix_test_watch, "~> 1.1", only: :dev, runtime: false}
+      {:mix_test_watch, "~> 1.1", only: :dev, runtime: false},
+      {:ex_doc, "> 0.0.0", only: :dev, runtime: false}
     ]
   end
 
@@ -57,5 +66,14 @@ defmodule ExTerm.MixProject do
         ]
       end
     )
+  end
+
+  defp package do
+    [
+      # These are the default files included in the package
+      files: ~w(lib .formatter.exs mix.exs README* LICENSE* CHANGELOG*),
+      licenses: ["MIT"],
+      links: %{"GitHub" => "https://github.com/ityonemo/match_spec"}
+    ]
   end
 end
