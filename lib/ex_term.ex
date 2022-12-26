@@ -23,13 +23,16 @@ defmodule ExTerm do
 
   2. Connect the ex_term CSS:
     - if you're using a css bundler, add to your "app.css" (or other css file in your assets directory)
-      ```
+
+      ```css
       @import "../../deps/ex_term/lib/css/default.css";
       ```
+
     - you may need a different strategy if you aren't using a css bundler.
 
   3. Create a live view in your routes
     - as a standalone liveview
+
       ```elixir
       scope "/" do
         pipe_through :browser
@@ -38,8 +41,10 @@ defmodule ExTerm do
         live "/", ExTerm
       end
       ```
+
     - you can also use it as a live component!
-      ```
+    
+      ```elixir
       <.live_component module={ExTerm}/>
       ```
 
