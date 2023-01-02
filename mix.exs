@@ -73,7 +73,7 @@ defmodule ExTerm.MixProject do
       # These are the default files included in the package
       files: ~w(lib .formatter.exs mix.exs README* LICENSE* CHANGELOG*),
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/ityonemo/match_spec"}
+      links: %{"GitHub" => "https://github.com/E-xyza/ex_term"}
     ]
   end
 end
