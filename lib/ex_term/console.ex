@@ -21,7 +21,7 @@ defmodule ExTerm.Console do
     ~H"""
     <div id="exterm-console">
       <%= for row <- @rows do %>
-      <Row.render row={row} cursor={@cursor} prompt={@prompt}/>
+      <Row.render row={row} cursor={@cursor} prompt={@prompt} location="console"/>
       <% end %>
     </div>
     """

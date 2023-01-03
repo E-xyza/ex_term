@@ -6,7 +6,7 @@ defmodule ExTerm.Console.Row do
 
   def render(assigns) do
     number = number(assigns.row)
-    assigns = Map.put(assigns, :id, "exterm-row-#{number}")
+    assigns = Map.put(assigns, :id, "exterm-row-#{number}-#{assigns.location}")
 
     ~H"""
     <div id={@id} class="exterm-row">
