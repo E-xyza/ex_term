@@ -43,7 +43,7 @@ defmodule ExTerm do
       ```
 
     - you can also use it as a live component!
-    
+
       ```elixir
       <.live_component module={ExTerm}/>
       ```
@@ -66,17 +66,26 @@ defmodule ExTerm do
   alias ExTerm.Tty
 
   use Phoenix.LiveView
+  alias Phoenix.LiveView.JS
 
   def render(assigns) do
     ~H"""
     <div id="exterm-terminal" class={class_for(@focus)} phx-keydown="keydown" phx-focus="focus" phx-blur="blur" tabindex="0">
       <div id="exterm-container">
-      <Buffer.render buffer={@buffer_lines}/>
-      <%= if @console do %>
-      <Console.render rows={@rows} cursor={@cursor} prompt={@prompt}/>
-      <% end %>
+        <Buffer.render buffer={@buffer_lines}/>
+        <%= if @console do %>
+        <Console.render rows={@rows} cursor={@cursor} prompt={@prompt}/>
+        <div id="exterm-anchor" phx-mounted={JS.dispatch("exterm:mounted", to: "#exterm-terminal")}/>
+        <% end %>
       </div>
     </div>
+    <!-- this script causes the anchor div to be pushed to the bottom-->
+    <script>
+      (() => {
+        const terminal = document.getElementById("exterm-terminal");
+        terminal.addEventListener("exterm:mounted", event => event.target.scroll(0, 5));
+      })()
+    </script>
     """
   end
 

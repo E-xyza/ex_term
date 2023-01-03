@@ -16,25 +16,25 @@ div#exterm-terminal {
     font-family: courier-new, courier, monospace;
     font-size: 15px;
     width: 100ch;
-    height: 500px;
+    height: 480px;
     position: relative;
-    overflow: auto;
-}
-
-div#exterm-container {
-    height: auto;
-    position: absolute;
-    bottom: 0px;
+    overflow-y: scroll;
 }
 
 div#exterm-buffer {
-    position: absolute;
-    bottom: 480px;
+    overflow-anchor: none;
+    position: relative;
 }
 
 div#exterm-console {
-    position: absolute;
-    bottom: 0px;
+    overflow-anchor: none;
+    position: relative;
+}
+
+div#exterm-anchor {
+    overflow-anchor: auto;
+    position: relative;
+    height: 1px;
 }
 
 div.exterm.exterm-blurred div.exterm-cursor.exterm-cursor-active {
