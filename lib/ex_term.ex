@@ -79,10 +79,12 @@ defmodule ExTerm do
         <% end %>
       </div>
     </div>
+    <div id="exterm-paste-target" phx-click="paste"/>
     <!-- this script causes the anchor div to be pushed to the bottom-->
     <script>
       (() => {
         const terminal = document.getElementById("exterm-terminal");
+        const paste_target = document.getElementById("exterm-paste-target")
         terminal.addEventListener("exterm:mounted", event => event.target.scroll(0, 5));
 
         const rowCol = (node) => {
@@ -153,7 +155,15 @@ defmodule ExTerm do
           event.preventDefault();
         }
 
-        terminal.addEventListener("copy", modifyClipboard)
+        const sendPaste = (event) => {
+          const paste_data = event.clipboardData.getData("text/plain");
+          paste_target.setAttribute("phx-value-paste", paste_data);
+          paste_target.click();
+          event.preventDefault();
+        }
+
+        terminal.addEventListener("copy", modifyClipboard);
+        terminal.addEventListener("paste", sendPaste)
       })()
     </script>
     """
@@ -360,6 +370,25 @@ defmodule ExTerm do
     {:noreply, socket}
   end
 
+  defp paste_impl(string, socket) do
+    new_socket = socket
+    |> do_paste(string)
+    |> repaint
+
+    {:noreply, new_socket}
+  end
+
+  defp do_paste(socket = %{assigns: %{prompt: prompt}}, string) do
+    case String.next_grapheme(string) do
+      {grapheme, rest} ->
+        socket
+        |> set_prompt(Prompt.push_key(prompt, grapheme), repaint: Prompt.active?(prompt))
+        |> do_paste(rest)
+      nil ->
+        socket
+    end
+  end
+
   #############################################################################
   ## Common functions
 
@@ -408,6 +437,7 @@ defmodule ExTerm do
   def handle_event("blur", payload, socket), do: blur_impl(payload, socket)
   def handle_event("keydown", %{"key" => key}, socket), do: handle_keydown(key, socket)
   def handle_event("keyup", %{"key" => key}, socket), do: handle_keyup(key, socket)
+  def handle_event("paste", %{"paste" => string}, socket), do: paste_impl(string, socket)
 
   def handle_event(type, payload, socket) do
     IO.warn("unhandled event of type #{type} (#{Jason.encode!(payload)})")
