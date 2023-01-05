@@ -363,13 +363,15 @@ defmodule ExTerm do
     unless ignored in @silent do
       IO.warn("got #{ignored}")
     end
+
     {:noreply, socket}
   end
 
   defp paste_impl(string, socket) do
-    new_socket = socket
-    |> do_paste(string)
-    |> repaint
+    new_socket =
+      socket
+      |> do_paste(string)
+      |> repaint
 
     {:noreply, new_socket}
   end
@@ -380,6 +382,7 @@ defmodule ExTerm do
         socket
         |> set_prompt(Prompt.push_key(prompt, grapheme), repaint: Prompt.active?(prompt))
         |> do_paste(rest)
+
       nil ->
         socket
     end

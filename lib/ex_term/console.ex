@@ -27,7 +27,9 @@ defmodule ExTerm.Console do
   import ExTerm.Console.Helpers
 
   @type permission :: :private | :protected | :public
-  @opaque t :: {permission, pid, :ets.table()}
+  @opaque t ::
+            {:private | :protected, pid, :ets.table()}
+            | {:public, pid, :ets.table(), :atomics.atomics_ref()}
   @type location :: {pos_integer(), pos_integer()}
 
   ############################################################################
@@ -46,20 +48,31 @@ defmodule ExTerm.Console do
   #############################################################################
   ## API
 
-  @spec put_chars(t, String.t()) :: t
-  @spec push_key(t, String.t()) :: boolean
+  #@spec put_chars(t, String.t()) :: t
+  #@spec push_key(t, String.t()) :: boolean
+
+  #############################################################################
+  ## GUARDS
 
   @spec permission(t) :: permission
-  defguardp permission(console) when elem(console, 0)
+  defguard permission(console) when elem(console, 0)
 
   @spec custodian(t) :: pid
-  defguardp custodian(console) when elem(console, 1)
+  defguard custodian(console) when elem(console, 1)
 
-  @spec is_accessible(t) :: boolean
-  defguardp is_accessible(console) when permission(console) in [:public, :private] or self() === custodian(console)
+  @spec spinlock(t) :: :atomics.atomics_ref()
+  defguard spinlock(console) when elem(console, 3)
 
-  @spec is_mutable(t) :: boolean
-  defguardp is_mutable(console) when permission(console) === :public or self() === custodian(console)
+  @spec is_access_ok(t) :: boolean
+  defguard is_access_ok(console)
+            when permission(console) in [:public, :private] or self() === custodian(console)
+
+  @spec is_mutate_ok(t) :: boolean
+  defguard is_mutate_ok(console)
+            when permission(console) === :public or self() === custodian(console)
+
+  @spec is_local(t) :: boolean
+  defguard is_local(console) when node(custodian(console)) === node()
 
   defp table(console), do: elem(console, 2)
 
@@ -71,34 +84,50 @@ defmodule ExTerm.Console do
     permission = Keyword.get(opts, :permission, :protected)
     {rows, columns} = layout = Keyword.get(opts, :layout, {24, 80})
     table = :ets.new(__MODULE__, [permission, :ordered_set])
-    console = {permission, self(), table}
+
+    console =
+      case permission do
+        :public -> {:public, self(), table, :atomics.new(1, signed: false)}
+        _ -> {permission, self(), table}
+      end
 
     cells = for row <- 1..rows, column <- 1..columns, do: {{row, column}, Cell.new()}
 
     :ets.insert(table, cells)
 
-    put_metadata(console, layout: layout, cursor: {1, 1}, style: %Style{})
+    transaction(console, :mutate) do
+      put_metadata(console, layout: layout, cursor: {1, 1}, style: %Style{})
+    end
   end
 
   @spec layout(t) :: location
   def layout(console) do
-    metadata(console, :layout)
+    transaction(console, :access) do
+      metadata(console, :layout)
+    end
   end
 
   @spec cursor(t) :: location
   def cursor(console) do
-    metadata(console, :cursor)
+    transaction(console, :access) do
+      metadata(console, :cursor)
+    end
   end
 
+  @spec style(t) :: Style.t
   def style(console) do
-    metadata(console, :style)
+    transaction(console, :access) do
+      metadata(console, :style)
+    end
   end
+
+  # basic access functions
 
   defmatchspecp get_ms({key, value}) do
     {{^key, ^value}, cell} -> cell
   end
 
-  @spec get(t, location) :: nil | Cell.t
+  @spec get(t, location) :: nil | Cell.t()
   defaccess get(console, location) do
     console
     |> table
@@ -118,14 +147,17 @@ defmodule ExTerm.Console do
     console
     |> table
     |> :ets.select(metadata_ms(key))
-    |> List.first
+    |> List.first()
   end
+
+  # basic mutations
 
   @spec put_metadata(t, term, term) :: t
   defmut put_metadata(console, key, value) do
     console
     |> table
     |> :ets.insert([{key, value}])
+
     console
   end
 
@@ -134,50 +166,14 @@ defmodule ExTerm.Console do
     console
     |> table
     |> :ets.insert(keyword)
-    console
-  end
-
-
-
-
-  def put_chars(console, chars) do
-    do_put_char(console, chars)
-  end
-
-  def push_key(console, key) do
-    do_put_char(console, key)
-  end
-
-  #############################################################################
-  ## COMMON FUNCTIONS
-
-  defp do_put_char(result, ""), do: result
-
-  @control 27
-
-  defp do_put_char(console, chars = <<@control, _::binary>>) do
-    style = Data.metadata(console, :style)
-    {style, rest} = Style.from_ansi(style, chars)
-    Data.put_metadata(console, style: style)
-
-    do_put_char(console, rest)
-  end
-
-  defp do_put_char(console, chars) do
-    {head, rest} = String.next_grapheme(chars)
 
     console
-    |> put_char_in_place(head)
-    |> do_put_char(rest)
   end
 
-  defp put_char_in_place(console, "\n"), do: cursor_crlf(console)
-
-  defp put_char_in_place(console, char) do
-    Data.put_char(console, char)
+  @spec put_char(t, location, Cell.t()) :: t
+  defmut put_char(console, location, char) do
+    console
+    |> table()
+    |> :ets.insert({location, char})
   end
-
-  defdelegate cursor_advance(console, columns), to: Data
-  defdelegate cursor_crlf(console), to: Data
-  defdelegate paint_chars(console, location, content, cursor_offset), to: Data
 end
