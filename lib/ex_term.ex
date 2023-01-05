@@ -72,7 +72,6 @@ defmodule ExTerm do
     ~H"""
     <div id="exterm-terminal" class={class_for(@focus)} phx-keydown="keydown" phx-focus="focus" phx-blur="blur" tabindex="0">
       <div id="exterm-container">
-        <Buffer.render buffer={@buffer_lines}/>
         <%= if @console do %>
         <Console.render rows={@rows} cursor={@cursor} prompt={@prompt}/>
         <div id="exterm-anchor" phx-mounted={JS.dispatch("exterm:mounted", to: "#exterm-terminal")}/>
@@ -178,7 +177,6 @@ defmodule ExTerm do
       socket
       |> set_tty
       |> set_modifiers
-      |> set_buffer
       |> set_console(if connected?(socket), do: Data.new())
       |> set_focus
       |> set_prompt
@@ -201,7 +199,6 @@ defmodule ExTerm do
     end
   end
 
-  defp set_buffer(socket, buffer \\ %Buffer{}), do: assign(socket, buffer: buffer)
   defp set_console(socket, console), do: assign(socket, console: console, rows: [], cursor: nil)
   defp set_focus(socket, focus \\ false), do: assign(socket, focus: focus)
 
@@ -235,7 +232,6 @@ defmodule ExTerm do
 
         {lines, new_top} ->
           socket
-          |> set_buffer(%{buffer | top_row: new_top})
           |> push_buffer_lines(lines)
       end
     else
