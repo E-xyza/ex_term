@@ -61,7 +61,10 @@ defmodule ExTerm.Console.Helpers do
 
       lambda = fn -> unquote(code) end
 
-      Process.put(:exterm_in_transaction, unquote(type))
+      if Process.put(:exterm_in_transaction, unquote(type)) do
+        raise "#{__ENV__.function} created a transaction when it was already in a transaction"
+      end
+
       result = case unquote(console) do
         unquote(prongs)
       end

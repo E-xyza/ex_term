@@ -54,24 +54,18 @@ defmodule ExTerm.Console do
   #############################################################################
   ## GUARDS
 
-  @spec permission(t) :: permission
   defguard permission(console) when elem(console, 0)
 
-  @spec custodian(t) :: pid
   defguard custodian(console) when elem(console, 1)
 
-  @spec spinlock(t) :: :atomics.atomics_ref()
   defguard spinlock(console) when elem(console, 3)
 
-  @spec is_access_ok(t) :: boolean
   defguard is_access_ok(console)
             when permission(console) in [:public, :private] or self() === custodian(console)
 
-  @spec is_mutate_ok(t) :: boolean
   defguard is_mutate_ok(console)
             when permission(console) === :public or self() === custodian(console)
 
-  @spec is_local(t) :: boolean
   defguard is_local(console) when node(custodian(console)) === node()
 
   defp table(console), do: elem(console, 2)
@@ -103,21 +97,21 @@ defmodule ExTerm.Console do
   @spec layout(t) :: location
   def layout(console) do
     transaction(console, :access) do
-      metadata(console, :layout)
+      get_metadata(console, :layout)
     end
   end
 
   @spec cursor(t) :: location
   def cursor(console) do
     transaction(console, :access) do
-      metadata(console, :cursor)
+      get_metadata(console, :cursor)
     end
   end
 
   @spec style(t) :: Style.t
   def style(console) do
     transaction(console, :access) do
-      metadata(console, :style)
+      get_metadata(console, :style)
     end
   end
 
@@ -142,8 +136,8 @@ defmodule ExTerm.Console do
     {^key, value} -> value
   end
 
-  @spec metadata(t, atom) :: term
-  defaccess metadata(console, key) do
+  @spec get_metadata(t, atom) :: term
+  defaccess get_metadata(console, key) do
     console
     |> table
     |> :ets.select(metadata_ms(key))
@@ -170,10 +164,20 @@ defmodule ExTerm.Console do
     console
   end
 
+  @spec delete_metadata(t, keyword) :: t
+  defmut delete_metadata(console, key) do
+    console
+    |> table
+    |> :ets.delete(key)
+
+    console
+  end
+
   @spec put_char(t, location, Cell.t()) :: t
   defmut put_char(console, location, char) do
     console
     |> table()
     |> :ets.insert({location, char})
+    console
   end
 end
