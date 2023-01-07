@@ -32,6 +32,7 @@ defmodule ExTerm.Console do
             | {:public, pid, :ets.table(), :atomics.atomics_ref()}
   @type location :: {pos_integer(), pos_integer()}
   @type update :: {from :: location, to :: location, last_cell :: location}
+  @type cellinfo :: {location, Cell.t}
 
   # message typing
   @type update_msg :: {:update, update}
@@ -222,10 +223,56 @@ defmodule ExTerm.Console do
     |> update_with({{line, 1}, {last_row + 1, last_column}, {last_row + 1, last_column - 1}})
   end
 
+  @spec put_string(t, String.t) :: t
+  defmut put_string(console, string) do
+    # first, obtain the cursor location.
+    # next obtain the
+
+    cursor = get_metadata(console, :cursor)
+    {last_row, last_column} = last_location(console)
+
+    {updates, new_location} = put_string(console, cursor, string)
+
+    console
+    |> insert(updates)
+    |> update_with({cursor, new_location, {last_row, last_column - 1}})
+    |> put_metadata(:cursor, new_location)
+  end
+
+  @spec put_string(t, location, String.t) :: {[cellinfo], location}
+  defp put_string(console, location, string) do
+    style = get_metadata(console, :style)
+    put_string_row(console, location, style, string)
+  end
+
+  defp put_string_row(console, location = {row, _}, style, string, updates \\ []) do
+    columns = columns(console, row)
+    case put_string_till_row_end(location, columns, style, string, updates) do
+      # exhausted the row without finishing the string
+      {updates, leftover} when is_binary(leftover) ->
+        put_string_row(console, {row + 1, 1}, style, leftover, updates)
+      done -> done
+    end
+  end
+
+  defp put_string_till_row_end({_, column}, columns, _style, string, updates) when column === columns + 1 do
+    {updates, string}
+  end
+
+  defp put_string_till_row_end(location = {row, column}, columns, style, string, updates) do
+    case String.next_grapheme(string) do
+      nil ->
+        {updates, location}
+      {grapheme, rest} -> :...
+        updates = [{location, %Cell{char: grapheme, style: style}} | updates]
+        put_string_till_row_end({row, column + 1}, columns, style, rest, updates)
+    end
+  end
+
   # functional utilities
 
   @spec update_with(t, update) :: t
-  def update_with(console, update) do
+  defp update_with(console, update) do
     case get_metadata(console, :handle_update) do
       fun when is_function(fun, 1) ->
         fun.(update)

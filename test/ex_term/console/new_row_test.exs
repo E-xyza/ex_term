@@ -5,6 +5,7 @@ defmodule ExTermTest.Console.NewRowTest do
   alias ExTerm.Console.Cell
   alias ExTerm.Console.Helpers
 
+  require Console
   require Helpers
 
   defp updates(info) do
@@ -20,7 +21,7 @@ defmodule ExTermTest.Console.NewRowTest do
         Console.new_row(console)
       end
 
-      assert_receive {:update, {{25, 1}, {25, 81}, {25, 80}}}
+      assert_receive Console.update_msg({{25, 1}, {25, 81}, {25, 80}})
 
       Helpers.transaction console, :access do
         for column <- 1..80 do
@@ -40,7 +41,7 @@ defmodule ExTermTest.Console.NewRowTest do
         Console.new_row(console)
       end
 
-      assert_receive {:update, {{6, 1}, {6, 6}, {6, 5}}}
+      assert_receive Console.update_msg({{6, 1}, {6, 6}, {6, 5}})
 
       Helpers.transaction console, :access do
         for column <- 1..5 do
@@ -63,7 +64,7 @@ defmodule ExTermTest.Console.NewRowTest do
         Console.new_row(console, 5)
       end
 
-      assert_receive {:update, {{5, 1}, {25, 81}, {25, 80}}}
+      assert_receive Console.update_msg({{5, 1}, {25, 81}, {25, 80}})
 
       Helpers.transaction console, :access do
         for column <- 1..80 do
@@ -96,7 +97,7 @@ defmodule ExTermTest.Console.NewRowTest do
         Console.new_row(console, 5)
       end
 
-      assert_receive {:update, {{5, 1}, {6, 6}, {6, 5}}}
+      assert_receive Console.update_msg({{5, 1}, {6, 6}, {6, 5}})
 
       Helpers.transaction console, :access do
         for column <- 1..5 do
