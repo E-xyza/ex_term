@@ -31,7 +31,13 @@ defmodule ExTerm.Console do
             {:private | :protected, pid, :ets.table()}
             | {:public, pid, :ets.table(), :atomics.atomics_ref()}
   @type location :: {pos_integer(), pos_integer()}
-  @type update :: {from::location, to::location, row_width :: pos_integer}
+  @type update :: {from :: location, to :: location, last_cell :: location}
+
+  # message typing
+  @type update_msg :: {:update, update}
+  defmacro update_msg(payload) do
+    quote do {:update, unquote(payload) = {{_, _}, {_, _}, {_, _}}} end
+  end
 
   ############################################################################
   ## rendering function
@@ -49,9 +55,6 @@ defmodule ExTerm.Console do
   #############################################################################
   ## API
 
-  #@spec put_chars(t, String.t()) :: t
-  #@spec push_key(t, String.t()) :: boolean
-
   #############################################################################
   ## GUARDS
 
@@ -62,10 +65,10 @@ defmodule ExTerm.Console do
   defguard spinlock(console) when elem(console, 3)
 
   defguard is_access_ok(console)
-            when permission(console) in [:public, :private] or self() === custodian(console)
+           when permission(console) in [:public, :private] or self() === custodian(console)
 
   defguard is_mutate_ok(console)
-            when permission(console) === :public or self() === custodian(console)
+           when permission(console) === :public or self() === custodian(console)
 
   defguard is_local(console) when node(custodian(console)) === node()
 
@@ -88,12 +91,21 @@ defmodule ExTerm.Console do
       end
 
     end_col = columns + 1
-    cells = for row <- 1..rows, column <- 1..end_col, do: {{row, column}, (if column === end_col, do: "\n")}
+
+    cells =
+      for row <- 1..rows,
+          column <- 1..end_col,
+          do: {{row, column}, %Cell{char: if(column === end_col, do: "\n")}}
 
     transaction(console, :mutate) do
       console
       |> insert(cells)
-      |> put_metadata(layout: layout, cursor: {1, 1}, style: %Style{}, handle_update: update_handler)
+      |> put_metadata(
+        layout: layout,
+        cursor: {1, 1},
+        style: %Style{},
+        handle_update: update_handler
+      )
     end
   end
 
@@ -111,7 +123,7 @@ defmodule ExTerm.Console do
     end
   end
 
-  @spec style(t) :: Style.t
+  @spec style(t) :: Style.t()
   def style(console) do
     transaction(console, :access) do
       get_metadata(console, :style)
@@ -168,34 +180,46 @@ defmodule ExTerm.Console do
     console
   end
 
-  @spec put_char(t, location, Cell.t()) :: t
-  defmut put_char(console, location, char) do
+  @spec put_cell(t, location, Cell.t()) :: t
+  defmut put_cell(console, location, char) do
     insert(console, {location, char})
   end
 
   # compound operations
-
-  defaccess last_row(console) do
-    # the last item in the table encodes the last row because the ordered
-    # set is ordered based on erlang term order and erlang term order puts tuples
-    # behind atoms, which are the only two types in the table.
-    console
-    |> table()
-    |> :ets.last()
-    |> elem(0)
+  defmatchspecp bump_rows_after(line) do
+    {{row, column}, cell} when row >= line -> {{row + 1, column}, cell}
   end
 
   @spec new_row(t, pos_integer() | :end) :: t
   def new_row(console, insertion_at \\ :end)
+
   defmut new_row(console, :end) do
-    row = last_row(console) + 1
+    {row, _} = last_location(console)
+    new_row = row + 1
     {_rows, columns} = get_metadata(console, :layout)
 
     # note it's okay to put that last one out of order because ets will
     # order it correctly.
     console
-    |> insert(make_blank_row(row, columns))
-    |> update_with({{row, 1}, {row, columns + 1}, columns})
+    |> insert(make_blank_row(new_row, columns))
+    |> update_with({{new_row, 1}, {new_row, columns + 1}, {new_row, columns}})
+  end
+
+  defmut new_row(console, line) when is_integer(line) do
+    new_row_columns = columns(console, line)
+    {last_row, last_column} = last_location(console)
+
+    moved_rows = console
+    |> table()
+    |> :ets.select(bump_rows_after(line))
+
+    update = line
+    |> make_blank_row(new_row_columns)
+    |> Enum.reverse(moved_rows)
+
+    console
+    |> insert(update)
+    |> update_with({{line, 1}, {last_row + 1, last_column}, {last_row + 1, last_column - 1}})
   end
 
   # functional utilities
@@ -205,8 +229,12 @@ defmodule ExTerm.Console do
     case get_metadata(console, :handle_update) do
       fun when is_function(fun, 1) ->
         fun.(update)
-      nil -> :ok
-      other -> raise "invalid update handler, expected arity 1 fun, got #{inspect other}"
+
+      nil ->
+        :ok
+
+      other ->
+        raise "invalid update handler, expected arity 1 fun, got #{inspect(other)}"
     end
 
     console
@@ -221,9 +249,39 @@ defmodule ExTerm.Console do
     console
   end
 
-  def make_blank_row(row, columns) do
-    [{{row, columns + 1}, %Cell{char: "\n"}} | for column <- 1..columns do
-      {{row, column}, %Cell{}}
-    end]
+  # activate when 0.3.1 hits, see https://github.com/E-xyza/match_spec/issues/28
+
+  #defmatchspecp column_count(row) do
+  #  {{^row, _}, cell} when cell.char !== "\n" -> true
+  #end
+
+  defp column_count(row) do
+    [{{{row, :_}, :"$1"}, [{:"=/=", {:map_get, :char, :"$1"}, {:const, "\n"}}], [true]}]
+  end
+
+  @spec columns(t, pos_integer) :: pos_integer
+  defp columns(console, row) do
+    console
+    |> table()
+    |> :ets.select_count(column_count(row))
+  end
+
+  @spec last_location(t) :: location
+  defp last_location(console) do
+    # the last item in the table encodes the last row because the ordered
+    # set is ordered based on erlang term order and erlang term order puts tuples
+    # behind atoms, which are the only two types in the table.
+    console
+    |> table()
+    |> :ets.last()
+  end
+
+  defp make_blank_row(row, columns) do
+    [
+      {{row, columns + 1}, %Cell{char: "\n"}}
+      | for column <- 1..columns do
+          {{row, column}, %Cell{}}
+        end
+    ]
   end
 end

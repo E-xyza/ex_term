@@ -15,7 +15,7 @@ defmodule ExTermTest.ConsoleTest do
       assert {1, 1} == Console.cursor(console)
       assert %Style{} == Console.style(console)
 
-      Helpers.transaction(console, :access) do
+      Helpers.transaction console, :access do
         for row <- 1..24, column <- 1..80 do
           assert %{char: nil} = Console.get(console, {row, column})
         end
@@ -30,7 +30,7 @@ defmodule ExTermTest.ConsoleTest do
 
       assert {5, 5} == Console.layout(console)
 
-      Helpers.transaction(console, :access) do
+      Helpers.transaction console, :access do
         for row <- 1..5, column <- 1..5 do
           assert %{char: nil} = Console.get(console, {row, column})
         end
@@ -47,36 +47,38 @@ defmodule ExTermTest.ConsoleTest do
     end
 
     test "nonexistent metadata start out as nil", %{console: console} do
-      Helpers.transaction(console, :access) do
+      Helpers.transaction console, :access do
         assert console
-        |> Console.get_metadata(:data)
-        |> is_nil
+               |> Console.get_metadata(:data)
+               |> is_nil
       end
     end
 
     test "you can set and retrieve console metadata with put_metadata/3", %{console: console} do
-      Helpers.transaction(console, :mutate) do
-        assert 47 === console
-        |> Console.put_metadata(:data, 47)
-        |> Console.get_metadata(:data)
+      Helpers.transaction console, :mutate do
+        assert 47 ===
+                 console
+                 |> Console.put_metadata(:data, 47)
+                 |> Console.get_metadata(:data)
       end
     end
 
     test "you can set and retrieve console metadata with put_metadata/2", %{console: console} do
-      Helpers.transaction(console, :mutate) do
-        assert 47 === console
-        |> Console.put_metadata(data: 47)
-        |> Console.get_metadata(:data)
+      Helpers.transaction console, :mutate do
+        assert 47 ===
+                 console
+                 |> Console.put_metadata(data: 47)
+                 |> Console.get_metadata(:data)
       end
     end
 
     test "you can delete console metadata", %{console: console} do
-      Helpers.transaction(console, :mutate) do
+      Helpers.transaction console, :mutate do
         assert console
-        |> Console.put_metadata(:data, 47)
-        |> Console.delete_metadata(:data)
-        |> Console.get_metadata(:data)
-        |> is_nil
+               |> Console.put_metadata(:data, 47)
+               |> Console.delete_metadata(:data)
+               |> Console.get_metadata(:data)
+               |> is_nil
       end
     end
   end
