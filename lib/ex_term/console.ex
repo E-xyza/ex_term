@@ -31,6 +31,7 @@ defmodule ExTerm.Console do
             {:private | :protected, pid, :ets.table()}
             | {:public, pid, :ets.table(), :atomics.atomics_ref()}
   @type location :: {pos_integer(), pos_integer()}
+  @type update :: {from::location, to::location, row_width :: pos_integer}
 
   ############################################################################
   ## rendering function
@@ -77,6 +78,7 @@ defmodule ExTerm.Console do
   def new(opts \\ []) do
     permission = Keyword.get(opts, :permission, :protected)
     {rows, columns} = layout = Keyword.get(opts, :layout, {24, 80})
+    update_handler = Keyword.get(opts, :handle_update)
     table = :ets.new(__MODULE__, [permission, :ordered_set])
 
     console =
@@ -85,12 +87,13 @@ defmodule ExTerm.Console do
         _ -> {permission, self(), table}
       end
 
-    cells = for row <- 1..rows, column <- 1..columns, do: {{row, column}, Cell.new()}
-
-    :ets.insert(table, cells)
+    end_col = columns + 1
+    cells = for row <- 1..rows, column <- 1..end_col, do: {{row, column}, (if column === end_col, do: "\n")}
 
     transaction(console, :mutate) do
-      put_metadata(console, layout: layout, cursor: {1, 1}, style: %Style{})
+      console
+      |> insert(cells)
+      |> put_metadata(layout: layout, cursor: {1, 1}, style: %Style{}, handle_update: update_handler)
     end
   end
 
@@ -148,20 +151,12 @@ defmodule ExTerm.Console do
 
   @spec put_metadata(t, term, term) :: t
   defmut put_metadata(console, key, value) do
-    console
-    |> table
-    |> :ets.insert([{key, value}])
-
-    console
+    insert(console, [{key, value}])
   end
 
   @spec put_metadata(t, keyword) :: t
   defmut put_metadata(console, keyword) do
-    console
-    |> table
-    |> :ets.insert(keyword)
-
-    console
+    insert(console, keyword)
   end
 
   @spec delete_metadata(t, keyword) :: t
@@ -175,9 +170,60 @@ defmodule ExTerm.Console do
 
   @spec put_char(t, location, Cell.t()) :: t
   defmut put_char(console, location, char) do
+    insert(console, {location, char})
+  end
+
+  # compound operations
+
+  defaccess last_row(console) do
+    # the last item in the table encodes the last row because the ordered
+    # set is ordered based on erlang term order and erlang term order puts tuples
+    # behind atoms, which are the only two types in the table.
     console
     |> table()
-    |> :ets.insert({location, char})
+    |> :ets.last()
+    |> elem(0)
+  end
+
+  @spec new_row(t, pos_integer() | :end) :: t
+  def new_row(console, insertion_at \\ :end)
+  defmut new_row(console, :end) do
+    row = last_row(console) + 1
+    {_rows, columns} = get_metadata(console, :layout)
+
+    # note it's okay to put that last one out of order because ets will
+    # order it correctly.
     console
+    |> insert(make_blank_row(row, columns))
+    |> update_with({{row, 1}, {row, columns + 1}, columns})
+  end
+
+  # functional utilities
+
+  @spec update_with(t, update) :: t
+  def update_with(console, update) do
+    case get_metadata(console, :handle_update) do
+      fun when is_function(fun, 1) ->
+        fun.(update)
+      nil -> :ok
+      other -> raise "invalid update handler, expected arity 1 fun, got #{inspect other}"
+    end
+
+    console
+  end
+
+  @spec insert(t, tuple | [tuple]) :: t
+  defp insert(console, content) do
+    console
+    |> table()
+    |> :ets.insert(content)
+
+    console
+  end
+
+  def make_blank_row(row, columns) do
+    [{{row, columns + 1}, %Cell{char: "\n"}} | for column <- 1..columns do
+      {{row, column}, %Cell{}}
+    end]
   end
 end
