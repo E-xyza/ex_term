@@ -8,8 +8,8 @@ defmodule ExTermTest.Console.PutStringTest do
   require Console
   require Helpers
 
-  defp updates(info) do
-    send(self(), {:update, info})
+  defp updates(update) do
+    send(self(), update)
   end
 
   setup do
@@ -22,23 +22,33 @@ defmodule ExTermTest.Console.PutStringTest do
       Helpers.transaction console, :mutate do
         Console.put_string(console, "foo")
 
-        assert_receive Console.update_msg({{1, 1}, {1, 3}, {5, 5}})
+        assert_receive Console.update_msg(
+                         from: {1, 1},
+                         to: {1, 3},
+                         cursor: {1, 4},
+                         last_cell: {5, 5}
+                       )
 
         assert %{char: "f"} = Console.get(console, {1, 1})
         assert %{char: "o"} = Console.get(console, {1, 2})
         assert %{char: "o"} = Console.get(console, {1, 3})
         assert %{char: nil} = Console.get(console, {1, 4})
       end
-
-      assert {1, 4} = Console.cursor(console)
     end
 
-    test "works when the string happens to be exactly the correct size of the console", %{console: console} do
+    test "works when the string happens to be exactly the correct size of the console", %{
+      console: console
+    } do
       # note that the cursor starts at {1, 1}
       Helpers.transaction console, :mutate do
         Console.put_string(console, "quuxy")
 
-        assert_receive Console.update_msg({{1, 1}, {1, 5}, {5, 5}})
+        assert_receive Console.update_msg(
+                         from: {1, 1},
+                         to: {1, 5},
+                         cursor: {2, 1},
+                         last_cell: {5, 5}
+                       )
 
         assert %{char: "q"} = Console.get(console, {1, 1})
         assert %{char: "u"} = Console.get(console, {1, 2})
@@ -47,8 +57,6 @@ defmodule ExTermTest.Console.PutStringTest do
         assert %{char: "y"} = Console.get(console, {1, 5})
         assert %{char: nil} = Console.get(console, {2, 1})
       end
-
-      assert {2, 1} = Console.cursor(console)
     end
 
     test "works when the string overflows a line", %{console: console} do
@@ -56,7 +64,12 @@ defmodule ExTermTest.Console.PutStringTest do
       Helpers.transaction console, :mutate do
         Console.put_string(console, "foobar")
 
-        assert_receive Console.update_msg({{1, 1}, {2, 1}, {5, 5}})
+        assert_receive Console.update_msg(
+                         from: {1, 1},
+                         to: {2, 1},
+                         cursor: {2, 2},
+                         last_cell: {5, 5}
+                       )
 
         assert %{char: "f"} = Console.get(console, {1, 1})
         assert %{char: "o"} = Console.get(console, {1, 2})
@@ -66,8 +79,34 @@ defmodule ExTermTest.Console.PutStringTest do
         assert %{char: "r"} = Console.get(console, {2, 1})
         assert %{char: nil} = Console.get(console, {2, 2})
       end
+    end
 
-      assert {2, 2} = Console.cursor(console)
+    test "puts in a new line when the string overflows the console", %{console: console} do
+      Helpers.transaction console, :mutate do
+        Console.move_cursor(console, {5, 1})
+
+        Console.put_string(console, "foobar")
+
+        assert_receive Console.update_msg(
+                         from: {5, 1},
+                         to: {6, 1},
+                         cursor: {6, 2},
+                         last_cell: {6, 5}
+                       )
+
+        assert %{char: "f"} = Console.get(console, {5, 1})
+        assert %{char: "o"} = Console.get(console, {5, 2})
+        assert %{char: "o"} = Console.get(console, {5, 3})
+        assert %{char: "b"} = Console.get(console, {5, 4})
+        assert %{char: "a"} = Console.get(console, {5, 5})
+        assert %{char: "r"} = Console.get(console, {6, 1})
+
+        for index <- 2..5 do
+          assert %{char: nil} = Console.get(console, {6, index})
+        end
+
+        assert %{char: "\n"} = Console.get(console, {6, 6})
+      end
     end
   end
 end

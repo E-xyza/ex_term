@@ -32,13 +32,16 @@ defmodule ExTerm.Console do
             {:private | :protected, pid, :ets.table()}
             | {:public, pid, :ets.table(), :atomics.atomics_ref()}
   @type location :: {pos_integer(), pos_integer()}
-  @type update :: {from :: location, to :: location, last_cell :: location}
-  @type cellinfo :: {location, Cell.t}
+  @type update ::
+          {:update, from :: location, to :: location, cursor :: location, last_cell :: location}
+  @type cellinfo :: {location, Cell.t()}
 
   # message typing
-  @type update_msg :: {:update, update}
-  defmacro update_msg(payload) do
-    quote do {:update, unquote(payload) = {{_, _}, {_, _}, {_, _}}} end
+  @type update_msg :: update
+  defmacro update_msg(from: from, to: to, cursor: cursor, last_cell: last_cell) do
+    quote do
+      {:update, unquote(from), unquote(to), unquote(cursor), unquote(last_cell)}
+    end
   end
 
   ############################################################################
@@ -181,7 +184,7 @@ defmodule ExTerm.Console do
     insert(console, keyword)
   end
 
-  @spec delete_metadata(t, keyword) :: t
+  @spec delete_metadata(t, atom) :: t
   def delete_metadata(console, key) do
     delete(console, key)
   end
@@ -200,7 +203,7 @@ defmodule ExTerm.Console do
   def new_row(console, insertion_at \\ :end)
 
   def new_row(console, :end) do
-    {row, _} = last_location(console)
+    {row, _} = last_cell(console)
     new_row = row + 1
     {_rows, columns} = get_metadata(console, :layout)
 
@@ -208,71 +211,112 @@ defmodule ExTerm.Console do
     # order it correctly.
     console
     |> insert(make_blank_row(new_row, columns))
-    |> update_with({{new_row, 1}, {new_row, columns + 1}, {new_row, columns}})
+    |> update_with({new_row, 1}, {new_row, columns + 1}, {new_row, columns})
   end
 
   def new_row(console, line) when is_integer(line) do
     new_row_columns = columns(console, line)
-    {last_row, last_column} = last_location(console)
+    {last_row, last_column} = last_cell(console)
 
     moved_rows = select(console, bump_rows_after(line))
 
-    update = line
-    |> make_blank_row(new_row_columns)
-    |> Enum.reverse(moved_rows)
+    update =
+      line
+      |> make_blank_row(new_row_columns)
+      |> Enum.reverse(moved_rows)
 
     console
     |> insert(update)
-    |> update_with({{line, 1}, {last_row + 1, last_column}, {last_row + 1, last_column - 1}})
+    |> update_with({line, 1}, {last_row + 1, last_column}, {last_row + 1, last_column - 1})
   end
 
-  @spec put_string(t, String.t) :: t
+  @spec put_string(t, String.t()) :: t
   def put_string(console, string) do
     # first, obtain the cursor location.
     # next obtain the
-    {last_row, last_column} = last_location(console)
     tracker = StringTracker.new(console)
 
-    updated = put_string_rows(tracker, string)
+    updated = put_string_rows(tracker, string) |> dbg(limit: 25)
 
     console
     |> insert(updated.updates)
-    |> update_with({tracker.cursor, updated.last_updated, {last_row, last_column - 1}})
     |> put_metadata(:cursor, updated.cursor)
+    |> update_with(tracker.cursor, updated.last_updated, last_cell(console))
   end
 
-  @spec put_string_rows(t, StringTracker.t) :: StringTracker.t
+  @spec put_string_rows(StringTracker.t(), String.t()) :: StringTracker.t()
   defp put_string_rows(tracker = %{cursor: {row, _}}, string) do
     columns = columns(tracker.console, row)
+
     case put_string_row(tracker, columns, string) do
       # exhausted the row without finishing the string
       {updated_tracker, leftover} ->
         put_string_rows(%{updated_tracker | cursor: {row + 1, 1}}, leftover)
-      done -> done
+
+      done ->
+        done
     end
   end
 
-  defp put_string_row(tracker = %{cursor: {_, column}}, columns, string) when column === columns + 1 do
-    {tracker, string}
+  defp put_string_row(tracker = %{cursor: {row, column}, console: console}, columns, string)
+       when column === columns + 1 do
+    if row === tracker.last_row do
+      # if we're at the end of the tracker, be sure to add a new row, first
+      new_row = row + 1
+      {_, columns} = get_metadata(console, :layout)
+      insert(console, make_blank_row(new_row, columns))
+      {%{tracker | last_row: new_row}, string}
+    else
+      {tracker, string}
+    end
   end
 
   defp put_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string) do
     case String.next_grapheme(string) do
       nil ->
         tracker
+
       {grapheme, rest} ->
         updates = [{cursor, %Cell{char: grapheme, style: tracker.style}} | tracker.updates]
-        put_string_row(%{tracker | cursor: {row, column + 1}, last_updated: cursor, updates: updates}, columns, rest)
+
+        put_string_row(
+          %{tracker | cursor: {row, column + 1}, last_updated: cursor, updates: updates},
+          columns,
+          rest
+        )
     end
+  end
+
+  @spec move_cursor(Console.t(), any) :: Console.t()
+  def move_cursor(console, new_cursor) do
+    old_cursor = get_metadata(console, :cursor)
+    last_cell = last_cell(console)
+
+    console
+    |> put_metadata(:cursor, new_cursor)
+    |> update_with(old_cursor, old_cursor, new_cursor, last_cell)
+    |> update_with(new_cursor, new_cursor, new_cursor, last_cell)
   end
 
   # functional utilities
 
-  @spec update_with(t, update) :: t
-  defp update_with(console, update) do
+  @spec update_with(
+          t,
+          from :: location,
+          to :: location,
+          cursor :: location,
+          last_cell :: location
+        ) :: t
+  @spec update_with(t, from :: location, to :: location, last_cell :: location) :: t
+  defp update_with(console, from, to, last_cell) do
+    cursor = get_metadata(console, :cursor)
+    update_with(console, from, to, cursor, last_cell)
+  end
+
+  defp update_with(console, from, to, cursor, last_cell) do
     case get_metadata(console, :handle_update) do
       fun when is_function(fun, 1) ->
-        fun.(update)
+        fun.(update_msg(from: from, to: to, cursor: cursor, last_cell: last_cell))
 
       nil ->
         :ok
@@ -284,7 +328,40 @@ defmodule ExTerm.Console do
     console
   end
 
-  @spec select(t, :ets.match_spec) :: [tuple]
+  # access and mutation functions
+  # activate when 0.3.1 hits, see https://github.com/E-xyza/match_spec/issues/28
+
+  # defmatchspecp column_count(row) do
+  #  {{^row, _}, cell} when cell.char !== "\n" -> true
+  # end
+
+  defp column_count(row) do
+    [{{{row, :_}, :"$1"}, [{:"=/=", {:map_get, :char, :"$1"}, {:const, "\n"}}], [true]}]
+  end
+
+  @spec columns(t, pos_integer) :: pos_integer
+  defaccess columns(console, row) do
+    console
+    |> table()
+    |> :ets.select_count(column_count(row))
+  end
+
+  @spec last_cell(t) :: location
+  defaccess last_cell(console) do
+    # the last item in the table encodes the last row because the ordered
+    # set is ordered based on erlang term order and erlang term order puts tuples
+    # behind atoms, which are the only two types in the table.
+    console
+    |> table()
+    |> :ets.last()
+    |> case do
+      {row, column} -> {row, column - 1}
+    end
+  end
+
+  # generic access functions
+
+  @spec select(t, :ets.match_spec()) :: [tuple]
   defaccess select(console, ms) do
     console
     |> table()
@@ -309,33 +386,7 @@ defmodule ExTerm.Console do
     console
   end
 
-  # activate when 0.3.1 hits, see https://github.com/E-xyza/match_spec/issues/28
-
-  #defmatchspecp column_count(row) do
-  #  {{^row, _}, cell} when cell.char !== "\n" -> true
-  #end
-
-  defp column_count(row) do
-    [{{{row, :_}, :"$1"}, [{:"=/=", {:map_get, :char, :"$1"}, {:const, "\n"}}], [true]}]
-  end
-
-  @spec columns(t, pos_integer) :: pos_integer
-  defaccess columns(console, row) do
-    console
-    |> table()
-    |> :ets.select_count(column_count(row))
-  end
-
-  @spec last_location(t) :: location
-  defp last_location(console) do
-    # the last item in the table encodes the last row because the ordered
-    # set is ordered based on erlang term order and erlang term order puts tuples
-    # behind atoms, which are the only two types in the table.
-    console
-    |> table()
-    |> :ets.last()
-  end
-
+  # other commonly usable functions
   defp make_blank_row(row, columns) do
     [
       {{row, columns + 1}, %Cell{char: "\n"}}
