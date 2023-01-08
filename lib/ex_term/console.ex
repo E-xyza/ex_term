@@ -22,6 +22,7 @@ defmodule ExTerm.Console do
 
   alias ExTerm.Console.Cell
   alias ExTerm.Console.Row
+  alias ExTerm.Console.StringTracker
   alias ExTerm.Style
 
   import ExTerm.Console.Helpers
@@ -138,51 +139,55 @@ defmodule ExTerm.Console do
   end
 
   @spec get(t, location) :: nil | Cell.t()
-  defaccess get(console, location) do
+  def get(console, location) do
     console
-    |> table
-    |> :ets.select(get_ms(location))
+    |> select(get_ms(location))
     |> case do
       [cell] -> cell
       [] -> nil
     end
   end
 
-  defmatchspecp metadata_ms(key) do
+  defmatchspecp metadata_ms(key) when is_atom(key) do
     {^key, value} -> value
   end
 
-  @spec get_metadata(t, atom) :: term
-  defaccess get_metadata(console, key) do
-    console
-    |> table
-    |> :ets.select(metadata_ms(key))
-    |> List.first()
+  defmatchspecp metadata_ms(keys) when is_list(keys) do
+    tuple = {key, _} when key in keys -> tuple
+  end
+
+  @spec get_metadata(t, atom | [atom]) :: term
+  @doc """
+  obtains a single key metadata or a list of keys.
+
+  Note that the keys will be returned in erlang term order.
+  """
+  def get_metadata(console, key) do
+    case select(console, metadata_ms(key)) do
+      list when is_atom(key) -> List.first(list)
+      list -> list
+    end
   end
 
   # basic mutations
 
   @spec put_metadata(t, term, term) :: t
-  defmut put_metadata(console, key, value) do
+  def put_metadata(console, key, value) do
     insert(console, [{key, value}])
   end
 
   @spec put_metadata(t, keyword) :: t
-  defmut put_metadata(console, keyword) do
+  def put_metadata(console, keyword) do
     insert(console, keyword)
   end
 
   @spec delete_metadata(t, keyword) :: t
-  defmut delete_metadata(console, key) do
-    console
-    |> table
-    |> :ets.delete(key)
-
-    console
+  def delete_metadata(console, key) do
+    delete(console, key)
   end
 
   @spec put_cell(t, location, Cell.t()) :: t
-  defmut put_cell(console, location, char) do
+  def put_cell(console, location, char) do
     insert(console, {location, char})
   end
 
@@ -194,7 +199,7 @@ defmodule ExTerm.Console do
   @spec new_row(t, pos_integer() | :end) :: t
   def new_row(console, insertion_at \\ :end)
 
-  defmut new_row(console, :end) do
+  def new_row(console, :end) do
     {row, _} = last_location(console)
     new_row = row + 1
     {_rows, columns} = get_metadata(console, :layout)
@@ -206,13 +211,11 @@ defmodule ExTerm.Console do
     |> update_with({{new_row, 1}, {new_row, columns + 1}, {new_row, columns}})
   end
 
-  defmut new_row(console, line) when is_integer(line) do
+  def new_row(console, line) when is_integer(line) do
     new_row_columns = columns(console, line)
     {last_row, last_column} = last_location(console)
 
-    moved_rows = console
-    |> table()
-    |> :ets.select(bump_rows_after(line))
+    moved_rows = select(console, bump_rows_after(line))
 
     update = line
     |> make_blank_row(new_row_columns)
@@ -224,48 +227,42 @@ defmodule ExTerm.Console do
   end
 
   @spec put_string(t, String.t) :: t
-  defmut put_string(console, string) do
+  def put_string(console, string) do
     # first, obtain the cursor location.
     # next obtain the
-
-    cursor = get_metadata(console, :cursor)
     {last_row, last_column} = last_location(console)
+    tracker = StringTracker.new(console)
 
-    {updates, new_location} = put_string(console, cursor, string)
+    updated = put_string_rows(tracker, string)
 
     console
-    |> insert(updates)
-    |> update_with({cursor, new_location, {last_row, last_column - 1}})
-    |> put_metadata(:cursor, new_location)
+    |> insert(updated.updates)
+    |> update_with({tracker.cursor, updated.last_updated, {last_row, last_column - 1}})
+    |> put_metadata(:cursor, updated.cursor)
   end
 
-  @spec put_string(t, location, String.t) :: {[cellinfo], location}
-  defp put_string(console, location, string) do
-    style = get_metadata(console, :style)
-    put_string_row(console, location, style, string)
-  end
-
-  defp put_string_row(console, location = {row, _}, style, string, updates \\ []) do
-    columns = columns(console, row)
-    case put_string_till_row_end(location, columns, style, string, updates) do
+  @spec put_string_rows(t, StringTracker.t) :: StringTracker.t
+  defp put_string_rows(tracker = %{cursor: {row, _}}, string) do
+    columns = columns(tracker.console, row)
+    case put_string_row(tracker, columns, string) do
       # exhausted the row without finishing the string
-      {updates, leftover} when is_binary(leftover) ->
-        put_string_row(console, {row + 1, 1}, style, leftover, updates)
+      {updated_tracker, leftover} ->
+        put_string_rows(%{updated_tracker | cursor: {row + 1, 1}}, leftover)
       done -> done
     end
   end
 
-  defp put_string_till_row_end({_, column}, columns, _style, string, updates) when column === columns + 1 do
-    {updates, string}
+  defp put_string_row(tracker = %{cursor: {_, column}}, columns, string) when column === columns + 1 do
+    {tracker, string}
   end
 
-  defp put_string_till_row_end(location = {row, column}, columns, style, string, updates) do
+  defp put_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string) do
     case String.next_grapheme(string) do
       nil ->
-        {updates, location}
-      {grapheme, rest} -> :...
-        updates = [{location, %Cell{char: grapheme, style: style}} | updates]
-        put_string_till_row_end({row, column + 1}, columns, style, rest, updates)
+        tracker
+      {grapheme, rest} ->
+        updates = [{cursor, %Cell{char: grapheme, style: tracker.style}} | tracker.updates]
+        put_string_row(%{tracker | cursor: {row, column + 1}, last_updated: cursor, updates: updates}, columns, rest)
     end
   end
 
@@ -287,11 +284,27 @@ defmodule ExTerm.Console do
     console
   end
 
+  @spec select(t, :ets.match_spec) :: [tuple]
+  defaccess select(console, ms) do
+    console
+    |> table()
+    |> :ets.select(ms)
+  end
+
   @spec insert(t, tuple | [tuple]) :: t
-  defp insert(console, content) do
+  defmutate insert(console, content) do
     console
     |> table()
     |> :ets.insert(content)
+
+    console
+  end
+
+  @spec delete(t, atom) :: t
+  defmutate delete(console, key) do
+    console
+    |> table
+    |> :ets.delete(key)
 
     console
   end
@@ -307,7 +320,7 @@ defmodule ExTerm.Console do
   end
 
   @spec columns(t, pos_integer) :: pos_integer
-  defp columns(console, row) do
+  defaccess columns(console, row) do
     console
     |> table()
     |> :ets.select_count(column_count(row))

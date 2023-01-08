@@ -143,7 +143,7 @@ defmodule ExTerm.Console.Helpers do
   creates a function that is tagged as a mutation.  The console argument must be the
   first argument.
   """
-  defmacro defmut({name, _, args}, do: code) do
+  defmacro defmutate({name, _, args}, do: code) do
     check_transaction =
       if @check_transaction do
         quote bind_quoted: [name: name] do
