@@ -192,7 +192,11 @@ defmodule ExTerm.Console do
 
   @spec put_cell(t, location, Cell.t()) :: t
   def put_cell(console, location, char) do
-    insert(console, {location, char})
+    last_cell = last_cell(console)
+
+    console
+    |> insert({location, char})
+    |> update_with(location, location, last_cell)
   end
 
   # compound operations

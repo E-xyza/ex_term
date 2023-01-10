@@ -25,7 +25,9 @@ defmodule ExTerm.Console.StringTracker do
         }
 
   def new(console) do
-    [cursor: cursor, layout: layout, style: style] = Console.get_metadata(console, [:cursor, :layout, :style])
+    [cursor: cursor, layout: layout, style: style] =
+      Console.get_metadata(console, [:cursor, :layout, :style])
+
     last_cell = Console.last_cell(console)
 
     %__MODULE__{
@@ -54,11 +56,15 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   def put_string_row(
-         tracker = %{cursor: {row, column}, console: console, last_cell: {last_row, last_cell_column}},
-         columns,
-         string
-       )
-       when column === columns + 1 do
+        tracker = %{
+          cursor: {row, column},
+          console: console,
+          last_cell: {last_row, last_cell_column}
+        },
+        columns,
+        string
+      )
+      when column === columns + 1 do
     if row === last_row do
       # if we're at the end of the tracker, be sure to add a new row, first
       new_row = row + 1
@@ -70,7 +76,7 @@ defmodule ExTerm.Console.StringTracker do
     end
   end
 
-  def put_string_row(tracker , columns, "\t" <> string) do
+  def put_string_row(tracker, columns, "\t" <> string) do
     {hard_tab(tracker, columns), string}
   end
 
@@ -143,6 +149,7 @@ defmodule ExTerm.Console.StringTracker do
 
   defp hard_return(tracker = %{cursor: {row, _column}}) do
     new_cursor = {row + 1, 1}
+
     tracker
     |> Map.put(:cursor, new_cursor)
     |> send_update
@@ -150,11 +157,14 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   defp hard_tab(tracker = %{cursor: {row, column}}, columns) do
-    new_cursor = case (div(column, 10) + 1) * 10 do
-      new_column when new_column > columns ->
-        {row + 1, 1}
-      new_column -> {row, new_column}
-    end
+    new_cursor =
+      case (div(column, 10) + 1) * 10 do
+        new_column when new_column > columns ->
+          {row + 1, 1}
+
+        new_column ->
+          {row, new_column}
+      end
 
     tracker
     |> Map.put(:cursor, new_cursor)

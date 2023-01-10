@@ -16,7 +16,7 @@ defmodule ExTermTest.Console.PutStringTest do
     {:ok, console: Console.new(handle_update: &updates/1, layout: {5, 5})}
   end
 
-  describe "put_string" do
+  describe "put_string/2" do
     test "works when the string is contained in the row", %{console: console} do
       # note that the cursor starts at {1, 1}
       Helpers.transaction console, :mutate do
@@ -108,6 +108,8 @@ defmodule ExTermTest.Console.PutStringTest do
         assert %{char: "\n"} = Console.get(console, {6, 6})
       end
     end
+
+    test "works when a new line pushes it over the edge"
   end
 
   describe "put_string with an intervening special actions" do

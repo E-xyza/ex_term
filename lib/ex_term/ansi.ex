@@ -20,7 +20,9 @@ defmodule ExTerm.ANSI do
     else
       {new_style = %Style{}, rest} ->
         parse(rest, {new_style, cursor})
-      {new_cursor = {_, _}, rest} -> parse(rest, {style, new_cursor})
+
+      {new_cursor = {_, _}, rest} ->
+        parse(rest, {style, new_cursor})
     end
   end
 
