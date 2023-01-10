@@ -179,7 +179,7 @@ defmodule ExTerm do
       |> set_modifiers
       |> set_console(if connected?(socket), do: Data.new())
       |> set_focus
-      |> set_prompt
+      # |> set_prompt
       |> repaint
 
     {:ok, new_socket, temporary_assigns: [buffer_lines: []]}
@@ -211,7 +211,7 @@ defmodule ExTerm do
     end
   end
 
-  defp set_prompt(socket, prompt \\ %Prompt{}, opts \\ []) do
+  defp set_prompt(socket, prompt, opts \\ []) do
     if opts[:repaint] do
       Prompt.paint(prompt, &Console.paint_chars(socket.assigns.console, &1, &2, &3))
     end
@@ -277,31 +277,31 @@ defmodule ExTerm do
   end
 
   defp get_line_impl(from, prompt_text, socket = %{assigns: %{prompt: prompt, console: console}}) do
-    # prompt contains "from" which is {ref, pid} if the prompt got activated
-    # and we are waiting for I/O.
-    # nil if there was content in the queue and it needs to be
-    # sent to I/O.
-
-    # always send the prompt_text to the console first.
-    Console.put_chars(console, prompt_text)
-    location = Data.metadata(console, :cursor)
-
-    prompt =
-      case Prompt.activate(prompt, from, location) do
-        {content, prompt = %Prompt{reply: nil}} ->
-          reply(from, content)
-          prompt
-
-        {_, prompt} ->
-          prompt
-      end
-
-    new_socket =
-      socket
-      |> set_prompt(prompt, repaint: true)
-      |> repaint
-
-    {:noreply, new_socket}
+    ## prompt contains "from" which is {ref, pid} if the prompt got activated
+    ## and we are waiting for I/O.
+    ## nil if there was content in the queue and it needs to be
+    ## sent to I/O.
+    #
+    ## always send the prompt_text to the console first.
+    # Console.put_chars(console, prompt_text)
+    # location = Data.metadata(console, :cursor)
+    #
+    # prompt =
+    #  case Prompt.activate(prompt, from, location) do
+    #    {content, prompt = %Prompt{reply: nil}} ->
+    #      reply(from, content)
+    #      prompt
+    #
+    #    {_, prompt} ->
+    #      prompt
+    #  end
+    #
+    # new_socket =
+    #  socket
+    #  |> set_prompt(prompt, repaint: true)
+    #  |> repaint
+    #
+    {:noreply, socket}
   end
 
   defp get_geometry_impl(from, type, socket) do

@@ -24,7 +24,7 @@ defmodule ExTermTest.Console.PutStringTest do
 
         assert_receive Console.update_msg(
                          from: {1, 1},
-                         to: {1, 3},
+                         to: {1, 4},
                          cursor: {1, 4},
                          last_cell: {5, 5}
                        )
@@ -45,7 +45,7 @@ defmodule ExTermTest.Console.PutStringTest do
 
         assert_receive Console.update_msg(
                          from: {1, 1},
-                         to: {1, 5},
+                         to: {2, 1},
                          cursor: {2, 1},
                          last_cell: {5, 5}
                        )
@@ -66,7 +66,7 @@ defmodule ExTermTest.Console.PutStringTest do
 
         assert_receive Console.update_msg(
                          from: {1, 1},
-                         to: {2, 1},
+                         to: {2, 2},
                          cursor: {2, 2},
                          last_cell: {5, 5}
                        )
@@ -89,7 +89,7 @@ defmodule ExTermTest.Console.PutStringTest do
 
         assert_receive Console.update_msg(
                          from: {5, 1},
-                         to: {6, 1},
+                         to: {6, 2},
                          cursor: {6, 2},
                          last_cell: {6, 5}
                        )
@@ -108,5 +108,79 @@ defmodule ExTermTest.Console.PutStringTest do
         assert %{char: "\n"} = Console.get(console, {6, 6})
       end
     end
+  end
+
+  describe "put_string with an intervening special actions" do
+    test "lf bumps the line", %{console: console} do
+      Helpers.transaction console, :mutate do
+        Console.put_string(console, "f\noo")
+
+        assert_receive Console.update_msg(
+                         from: {1, 1},
+                         to: {1, 1},
+                         cursor: {2, 1},
+                         last_cell: {5, 5}
+                       )
+
+        # note that since the cursor moved to this point
+        # it's gonna be in the update.
+        assert_receive Console.update_msg(
+                         from: {2, 1},
+                         to: {2, 3},
+                         cursor: {2, 3},
+                         last_cell: {5, 5}
+                       )
+
+        assert %{char: "f"} = Console.get(console, {1, 1})
+        assert %{char: "o"} = Console.get(console, {2, 1})
+        assert %{char: "o"} = Console.get(console, {2, 2})
+      end
+    end
+
+    test "crlf bumps the line", %{console: console} do
+      Helpers.transaction console, :mutate do
+        Console.put_string(console, "f\r\noo")
+
+        assert_receive Console.update_msg(
+                         from: {1, 1},
+                         to: {1, 1},
+                         cursor: {2, 1},
+                         last_cell: {5, 5}
+                       )
+
+        # note that since the cursor moved to this point
+        # it's gonna be in the update.
+        assert_receive Console.update_msg(
+                         from: {2, 1},
+                         to: {2, 3},
+                         cursor: {2, 3},
+                         last_cell: {5, 5}
+                       )
+
+        assert %{char: "f"} = Console.get(console, {1, 1})
+        assert %{char: nil} = Console.get(console, {1, 2})
+        assert %{char: "o"} = Console.get(console, {2, 1})
+        assert %{char: "o"} = Console.get(console, {2, 2})
+      end
+    end
+
+    test "ANSI code can change the style", %{console: console} do
+      Helpers.transaction console, :mutate do
+        Console.put_string(console, "f" <> IO.ANSI.red() <> "oo")
+
+        assert_receive Console.update_msg(
+                         from: {1, 1},
+                         to: {1, 4},
+                         cursor: {1, 4},
+                         last_cell: {5, 5}
+                       )
+
+        assert %{char: "f", style: %{color: nil}} = Console.get(console, {1, 1})
+        assert %{char: "o", style: %{color: :red}} = Console.get(console, {1, 2})
+        assert %{char: "o", style: %{color: :red}} = Console.get(console, {1, 3})
+      end
+    end
+
+    test "ANSI code can change the cursor location"
   end
 end

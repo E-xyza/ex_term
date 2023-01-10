@@ -163,7 +163,8 @@ defmodule ExTerm.Console do
   @doc """
   obtains a single key metadata or a list of keys.
 
-  Note that the keys will be returned in erlang term order.
+  Note that if you provide a list of keys the values will be returned as a
+  keyword list, in erlang term order of the keys.
   """
   def get_metadata(console, key) do
     case select(console, metadata_ms(key)) do
@@ -174,7 +175,7 @@ defmodule ExTerm.Console do
 
   # basic mutations
 
-  @spec put_metadata(t, term, term) :: t
+  @spec put_metadata(t, atom, term) :: t
   def put_metadata(console, key, value) do
     insert(console, [{key, value}])
   end
@@ -234,60 +235,44 @@ defmodule ExTerm.Console do
   def put_string(console, string) do
     # first, obtain the cursor location.
     # next obtain the
-    tracker = StringTracker.new(console)
-
-    updated = put_string_rows(tracker, string) |> dbg(limit: 25)
-
     console
-    |> insert(updated.updates)
-    |> put_metadata(:cursor, updated.cursor)
-    |> update_with(tracker.cursor, updated.last_updated, last_cell(console))
+    |> StringTracker.new()
+    |> StringTracker.put_string_rows(string)
+    |> dbg(limit: 25)
+    |> StringTracker.send_update(with_cursor: true)
+    |> Map.get(:console)
   end
 
-  @spec put_string_rows(StringTracker.t(), String.t()) :: StringTracker.t()
-  defp put_string_rows(tracker = %{cursor: {row, _}}, string) do
-    columns = columns(tracker.console, row)
-
-    case put_string_row(tracker, columns, string) do
-      # exhausted the row without finishing the string
-      {updated_tracker, leftover} ->
-        put_string_rows(%{updated_tracker | cursor: {row + 1, 1}}, leftover)
-
-      done ->
-        done
-    end
+  defmatchspecp cell_range(row, column_start, row, column_end) do
+    tuple = {{^row, column}, _} when column >= column_start and column <= column_end -> tuple
   end
 
-  defp put_string_row(tracker = %{cursor: {row, column}, console: console}, columns, string)
-       when column === columns + 1 do
-    if row === tracker.last_row do
-      # if we're at the end of the tracker, be sure to add a new row, first
-      new_row = row + 1
-      {_, columns} = get_metadata(console, :layout)
-      insert(console, make_blank_row(new_row, columns))
-      {%{tracker | last_row: new_row}, string}
-    else
-      {tracker, string}
-    end
+  defmatchspecp cell_range(row_start, column_start, row_end, column_end)
+                when row_start + 1 === row_end do
+    tuple = {{^row_start, column}, cell} when column >= column_start and cell.char !== "\n" ->
+      tuple
+
+    tuple = {{^row_end, column}, _} when column <= column_end ->
+      tuple
   end
 
-  defp put_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string) do
-    case String.next_grapheme(string) do
-      nil ->
-        tracker
+  defmatchspecp cell_range(row_start, column_start, row_end, column_end) do
+    tuple = {{^row_start, column}, cell} when column >= column_start and cell.char !== "\n" ->
+      tuple
 
-      {grapheme, rest} ->
-        updates = [{cursor, %Cell{char: grapheme, style: tracker.style}} | tracker.updates]
+    tuple = {{row, column}, cell} when row > row_start and row < row_end and cell.char !== "\n" ->
+      tuple
 
-        put_string_row(
-          %{tracker | cursor: {row, column + 1}, last_updated: cursor, updates: updates},
-          columns,
-          rest
-        )
-    end
+    tuple = {{^row_end, column}, _} when column <= column_end ->
+      tuple
   end
 
-  @spec move_cursor(Console.t(), any) :: Console.t()
+  @spec cells(t, location, location) :: [cellinfo]
+  def cells(console, {row_start, column_start}, {row_end, column_end}) do
+    select(console, cell_range(row_start, column_start, row_end, column_end))
+  end
+
+  @spec move_cursor(t(), any) :: t()
   def move_cursor(console, new_cursor) do
     old_cursor = get_metadata(console, :cursor)
     last_cell = last_cell(console)
@@ -328,12 +313,9 @@ defmodule ExTerm.Console do
     console
   end
 
-  # access and mutation functions
-  # activate when 0.3.1 hits, see https://github.com/E-xyza/match_spec/issues/28
-
-  # defmatchspecp column_count(row) do
-  #  {{^row, _}, cell} when cell.char !== "\n" -> true
-  # end
+  defmatchspecp column_count(row) do
+    {{^row, _}, cell} when cell.char !== "\n" -> true
+  end
 
   defp column_count(row) do
     [{{{row, :_}, :"$1"}, [{:"=/=", {:map_get, :char, :"$1"}, {:const, "\n"}}], [true]}]
@@ -387,7 +369,7 @@ defmodule ExTerm.Console do
   end
 
   # other commonly usable functions
-  defp make_blank_row(row, columns) do
+  def make_blank_row(row, columns) do
     [
       {{row, columns + 1}, %Cell{char: "\n"}}
       | for column <- 1..columns do

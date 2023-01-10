@@ -9,7 +9,7 @@ defmodule ExTermTest.Console.NewRowTest do
   require Helpers
 
   defp updates(info) do
-    send(self(), {:update, info})
+    send(self(), info)
   end
 
   describe "new_row at the end" do

@@ -30,7 +30,7 @@ defmodule ExTerm.Style do
           bgcolor: nil | color | String.t(),
           blink: nil | :rapid | :slow,
           intensity: nil | :bright | :faint,
-          frame: :framed | :encircled,
+          frame: nil | :framed | :encircled,
           conceal: boolean,
           italic: boolean,
           underline: boolean,
@@ -40,7 +40,7 @@ defmodule ExTerm.Style do
 
   def new, do: %__MODULE__{}
 
-  @spec from_ansi(t, String.t()) :: {t, String.t()}
+  @spec from_ansi(t, String.t()) :: {t, String.t()} | :not_style
   def from_ansi(style \\ %__MODULE__{}, string)
 
   @named_colors ~w(black red green yellow blue magenta cyan white)a
@@ -48,13 +48,13 @@ defmodule ExTerm.Style do
     foreground_control = apply(IO.ANSI, color, [])
 
     def from_ansi(style, unquote(foreground_control) <> rest) do
-      from_ansi(%{style | color: unquote(color)}, rest)
+      {%{style | color: unquote(color)}, rest}
     end
 
     background_control = apply(IO.ANSI, :"#{color}_background", [])
 
     def from_ansi(style, unquote(background_control) <> rest) do
-      from_ansi(%{style | bgcolor: unquote(color)}, rest)
+      {%{style | bgcolor: unquote(color)}, rest}
     end
 
     light_color = :"light-#{color}"
@@ -62,13 +62,13 @@ defmodule ExTerm.Style do
     light_foreground_control = apply(IO.ANSI, :"light_#{color}", [])
 
     def from_ansi(style, unquote(light_foreground_control) <> rest) do
-      from_ansi(%{style | color: unquote(light_color)}, rest)
+      {%{style | color: unquote(light_color)}, rest}
     end
 
     light_background_control = apply(IO.ANSI, :"light_#{color}_background", [])
 
     def from_ansi(style, unquote(light_background_control) <> rest) do
-      from_ansi(%{style | bgcolor: unquote(light_color)}, rest)
+      {%{style | bgcolor: unquote(light_color)}, rest}
     end
   end
 
@@ -76,7 +76,7 @@ defmodule ExTerm.Style do
     attribute_control = apply(IO.ANSI, attribute, [])
 
     def from_ansi(style, unquote(attribute_control) <> rest) do
-      from_ansi(%{style | unquote(attribute) => true}, rest)
+      {%{style | unquote(attribute) => true}, rest}
     end
   end
 
@@ -88,7 +88,7 @@ defmodule ExTerm.Style do
     clear_control = apply(IO.ANSI, clear, [])
 
     def from_ansi(style, unquote(clear_control) <> rest) do
-      from_ansi(%{style | unquote(attribute) => false}, rest)
+      {%{style | unquote(attribute) => false}, rest}
     end
   end
 
@@ -96,7 +96,7 @@ defmodule ExTerm.Style do
     intensity_control = apply(IO.ANSI, intensity, [])
 
     def from_ansi(style, unquote(intensity_control) <> rest) do
-      from_ansi(%{style | intensity: unquote(intensity)}, rest)
+      {%{style | intensity: unquote(intensity)}, rest}
     end
   end
 
@@ -104,21 +104,21 @@ defmodule ExTerm.Style do
     blink_control = apply(IO.ANSI, :"blink_#{blink_speed}", [])
 
     def from_ansi(style, unquote(blink_control) <> rest) do
-      from_ansi(%{style | blink: unquote(blink_speed)}, rest)
+      {%{style | blink: unquote(blink_speed)}, rest}
     end
   end
 
   blink_clear = IO.ANSI.blink_off()
 
   def from_ansi(style, unquote(blink_clear) <> rest) do
-    from_ansi(%{style | blink: nil}, rest)
+    {%{style | blink: nil}, rest}
   end
 
   for frame_type <- [:framed, :encircled] do
     frame_control = apply(IO.ANSI, frame_type, [])
 
     def from_ansi(style, unquote(frame_control) <> rest) do
-      from_ansi(%{style | frame: unquote(frame_type)}, rest)
+      {%{style | frame: unquote(frame_type)}, rest}
     end
   end
 
@@ -130,17 +130,17 @@ defmodule ExTerm.Style do
     clear = apply(IO.ANSI, function, [])
 
     def from_ansi(style, unquote(clear) <> rest) do
-      from_ansi(%{style | unquote(field) => nil}, rest)
+      {%{style | unquote(field) => nil}, rest}
     end
   end
 
   @reset IO.ANSI.reset()
 
   def from_ansi(_style, @reset <> rest) do
-    from_ansi(%__MODULE__{}, rest)
+    {%__MODULE__{}, rest}
   end
 
-  def from_ansi(style, rest), do: {style, rest}
+  def from_ansi(_style, _rest), do: :not_style
 
   @keys ~w(color bgcolor blink intensity frame conceal italic underline crossed_out overlined)a
   def to_iodata(style) do
