@@ -21,20 +21,16 @@ defmodule ExTermTest.Console.InsertStringTest do
       # note that the cursor starts at {1, 1}
       Helpers.transaction console, :mutate do
         Console.put_cell(console, {5, 5}, %Cell{char: "a"})
+
+        Console.get_metadata(console, :cursor)
+
         # inserts a string on line 4
         Console.insert_string(console, "foo", 5)
 
         assert_receive Console.update_msg(
                          from: {5, 1},
-                         to: {5, 4},
-                         cursor: {1, 4},
-                         last_cell: {6, 5}
-                       )
-
-        assert_receive Console.update_msg(
-                         from: {6, 1},
                          to: {6, 6},
-                         cursor: {1, 4},
+                         cursor: {1, 1},
                          last_cell: {6, 5}
                        )
 

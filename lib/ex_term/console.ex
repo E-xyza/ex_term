@@ -237,43 +237,61 @@ defmodule ExTerm.Console do
 
   @spec put_string(t, String.t()) :: t
   def put_string(console, string) do
-    # first, obtain the cursor location.
-    # next obtain the
     console
     |> StringTracker.new()
     |> StringTracker.put_string_rows(string)
-    |> dbg(limit: 25)
     |> StringTracker.send_update(with_cursor: true)
     |> Map.get(:console)
   end
 
-  defmatchspecp cell_range(row, column_start, row, column_end) do
+  @spec insert_string(t, String.t(), line :: pos_integer()) :: t
+  @doc """
+  `inserts` a string at a certain line.
+
+  This will "push down" as many lines as is necessary to insert the string.
+  If the current cursor precedes the insertion point, it will be unaffected.
+  If the current cursor is after the insertion point, it will be displaced
+  as many lines as makes sense.  ANSI "cursor" movements in the context of
+  this insertion are PINNED to the full lines of the inserted content.
+
+  An ANSI "clear" operation only clears the region inserted so far.
+  """
+  def insert_string(console, string, line) do
+    console
+    |> StringTracker.new(line)
+    |> StringTracker.insert_string_rows(string)
+    |> StringTracker.send_update()
+
+    |> Map.get(:console)
+  end
+
+  defmatchspecp cell_range_ms(row, column_start, row, column_end) do
     tuple = {{^row, column}, _} when column >= column_start and column <= column_end -> tuple
   end
 
-  defmatchspecp cell_range(row_start, column_start, row_end, column_end)
+  defmatchspecp cell_range_ms(row_start, column_start, row_end, column_end)
                 when row_start + 1 === row_end do
-    tuple = {{^row_start, column}, cell} when column >= column_start and cell.char !== "\n" ->
+    tuple = {{^row_start, column}, cell} when column >= column_start ->
       tuple
 
     tuple = {{^row_end, column}, _} when column <= column_end ->
       tuple
   end
 
-  defmatchspecp cell_range(row_start, column_start, row_end, column_end) do
-    tuple = {{^row_start, column}, cell} when column >= column_start and cell.char !== "\n" ->
-      tuple
-
-    tuple = {{row, column}, cell} when row > row_start and row < row_end and cell.char !== "\n" ->
+  defmatchspecp cell_range_ms(row_start, column_start, row_end, column_end) do
+    tuple = {{^row_start, column}, cell} when column >= column_start ->
       tuple
 
     tuple = {{^row_end, column}, _} when column <= column_end ->
+      tuple
+
+    tuple = {{row, column}, cell} when row > row_start and row < row_end ->
       tuple
   end
 
   @spec cells(t, location, location) :: [cellinfo]
   def cells(console, {row_start, column_start}, {row_end, column_end}) do
-    select(console, cell_range(row_start, column_start, row_end, column_end))
+    select(console, cell_range_ms(row_start, column_start, row_end, column_end))
   end
 
   @spec move_cursor(t(), any) :: t()
@@ -317,22 +335,49 @@ defmodule ExTerm.Console do
     console
   end
 
-  defmatchspecp column_count(row) do
+  defmatchspecp column_count_ms(row) do
     {{^row, _}, cell} when cell.char !== "\n" -> true
   end
 
-  defp column_count(row) do
-    [{{{row, :_}, :"$1"}, [{:"=/=", {:map_get, :char, :"$1"}, {:const, "\n"}}], [true]}]
+  defmatchspecp full_row_ms(row, true) do
+    tuple = {{^row, _}, _} -> tuple
   end
 
-  @spec columns(t, pos_integer) :: pos_integer
+  defmatchspecp full_row_ms(row, false) do
+    tuple = {{^row, _}, cell} when cell.char !== "\n" -> tuple
+  end
+
+  @spec columns(t, row :: pos_integer) :: non_neg_integer
+  @doc """
+  returns the number of columns in a given row.
+
+  Does not include the sentinel in the final count.
+
+  If the row doesn't exist, returns 0.
+  """
   defaccess columns(console, row) do
     console
     |> table()
-    |> :ets.select_count(column_count(row))
+    |> :ets.select_count(column_count_ms(row))
+  end
+
+  @spec full_row(t, row :: pos_integer, with_sentinel? :: boolean) :: [cellinfo]
+  @doc """
+  returns a full row, in ascending order.
+
+  May include the sentinel, if `with_sentinel?` is `true` (defaults to `false`)
+  """
+  def full_row(console, row, with_sentinel? \\ false) do
+    select(console, full_row_ms(row, with_sentinel?))
   end
 
   @spec last_cell(t) :: location
+  @doc """
+  returns the last location on the console.
+
+  Does NOT include the sentinel.  There is always guaranteed to be a sentinel
+  on the end of the cell.
+  """
   defaccess last_cell(console) do
     # the last item in the table encodes the last row because the ordered
     # set is ordered based on erlang term order and erlang term order puts tuples
@@ -375,7 +420,7 @@ defmodule ExTerm.Console do
   # other commonly usable functions
   def make_blank_row(row, columns) do
     [
-      {{row, columns + 1}, %Cell{char: "\n"}}
+      {{row, columns + 1}, Cell.sentinel()}
       | for column <- 1..columns do
           {{row, column}, %Cell{}}
         end
