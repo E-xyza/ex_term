@@ -62,7 +62,15 @@ defmodule ExTerm.Console.StringTracker do
   @spec put_string_rows(t(), String.t()) :: t()
   def put_string_rows(tracker = %{cursor: {row, _}, insertion: nil}, string) do
     # NB: don't cache the number of rows.  Row length should be fixed once set.
-    columns = Console.columns(tracker.console, row)
+    columns =
+      case Console.columns(tracker.console, row) do
+        0 ->
+          elem(tracker.layout, 1)
+
+        columns ->
+          columns
+      end
+
     case put_string_row(tracker, columns, string) do
       # exhausted the row without finishing the string
       {updated_tracker, leftover} ->
@@ -70,6 +78,8 @@ defmodule ExTerm.Console.StringTracker do
 
       done ->
         done
+        |> pad_last_row(columns)
+        |> update_insert()
     end
   end
 
@@ -77,6 +87,7 @@ defmodule ExTerm.Console.StringTracker do
   def insert_string_rows(tracker = %{insertion: row}, string) when is_integer(row) do
     # NB: don't cache the number of rows.  Row length should be fixed once set.
     columns = Console.columns(tracker.console, row)
+
     case put_string_row(tracker, columns, string) do
       done = %{updates: [{{last_row, _}, _} | _]} ->
         # figure out how many rows we need to move.  This is determined by the number
@@ -92,41 +103,20 @@ defmodule ExTerm.Console.StringTracker do
     end
   end
 
-  def put_string_row(
-        tracker = %{
-          cursor: {row, column},
-          console: console,
-          last_cell: {last_row, last_cell_column}
-        },
-        columns,
-        string
-      )
-      when column === columns + 1 do
-    if row === last_row do
-      # if we're at the end of the tracker, be sure to add a new row, first
-      new_row = row + 1
-      {_, columns} = tracker.layout
-      Console.insert(console, Console.make_blank_row(new_row, columns))
-      {%{tracker | last_cell: {new_row, last_cell_column}}, string}
-    else
-      {tracker, string}
-    end
+  def put_string_row(tracker, columns, "\t" <> rest) do
+    {hard_tab(tracker, columns), rest}
   end
 
-  def put_string_row(tracker, columns, "\t" <> string) do
-    {hard_tab(tracker, columns), string}
+  def put_string_row(tracker, _columns, "\r\n" <> rest) do
+    {hard_return(tracker), rest}
   end
 
-  def put_string_row(tracker, _columns, "\r\n" <> string) do
-    {hard_return(tracker), string}
+  def put_string_row(tracker, _columns, "\r" <> rest) do
+    {hard_return(tracker), rest}
   end
 
-  def put_string_row(tracker, _columns, "\r" <> string) do
-    {hard_return(tracker), string}
-  end
-
-  def put_string_row(tracker, _columns, "\n" <> string) do
-    {hard_return(tracker), string}
+  def put_string_row(tracker, _columns, "\n" <> rest) do
+    {hard_return(tracker), rest}
   end
 
   def put_string_row(tracker = %{cursor: cursor}, columns, string = "\e" <> _) do
@@ -183,18 +173,20 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   defp pad_last_row(tracker = %{cursor: {_, cursor_column}}, columns) do
-    {row, keys} = Enum.reduce(tracker.updates, {0, MapSet.new()}, fn
-      {location = {this_row, _}, _}, {highest_row, keys} ->
-        new_highest_row = if this_row > highest_row, do: this_row, else: highest_row
-        {new_highest_row, MapSet.put(keys, location)}
-    end)
+    {row, keys} =
+      Enum.reduce(tracker.updates, {0, MapSet.new()}, fn
+        {location = {this_row, _}, _}, {highest_row, keys} ->
+          new_highest_row = if this_row > highest_row, do: this_row, else: highest_row
+          {new_highest_row, MapSet.put(keys, location)}
+      end)
 
-    new_updates = for column <- cursor_column..columns, {row, column} not in keys, reduce: tracker.updates do
-      updates -> [{{row, column}, %Cell{}} | updates]
-    end
+    new_updates =
+      for column <- cursor_column..columns, {row, column} not in keys, reduce: tracker.updates do
+        updates -> [{{row, column}, %Cell{}} | updates]
+      end
 
     # fill out the row.
-    %{tracker | updates: [{{row, columns + 1}, Cell.sentinel()} | new_updates]}
+    %{tracker | updates: prepend_sentinel(new_updates, {row, columns + 1})}
   end
 
   # MOVE_SUCCEEDING ROWS.
@@ -214,7 +206,9 @@ defmodule ExTerm.Console.StringTracker do
     {{^row, column}, cell} when column <= limit -> {{destination_row, column}, cell}
   end
 
-  @spec move_rows(Console.t(), pos_integer(), pos_integer(), nil | :sentinel | pos_integer()) :: [Console.cell_info]
+  @spec move_rows(Console.t(), pos_integer(), pos_integer(), nil | :sentinel | pos_integer()) :: [
+          Console.cell_info()
+        ]
   defp move_rows(console, row, destination_row, limit \\ nil) do
     Console.select(console, move_rows_ms(row, destination_row, limit))
   end
@@ -224,74 +218,86 @@ defmodule ExTerm.Console.StringTracker do
     tracker
   end
 
-  defp move_succeeding_rows(tracker = %{console: console, layout: {_, layout_columns}}, row, move_distance) do
+  defp move_succeeding_rows(
+         tracker = %{console: console, layout: {_, layout_columns}},
+         row,
+         move_distance
+       ) do
     # get the length of the destination row.
     destination_row = row + move_distance
     source_length = Console.columns(console, row)
     destination_length = Console.columns(console, destination_row)
 
-    new_updates = case source_length do
-      length when length === destination_length ->
-        # destination size matches the source length.
-        console
-        |> move_rows(row, destination_row) # obtain the row.
-        |> Enum.reverse(tracker.updates)
+    new_updates =
+      case source_length do
+        length when length === destination_length ->
+          # destination size matches the source length.
+          console
+          # obtain the row.
+          |> move_rows(row, destination_row)
+          |> Enum.reverse(tracker.updates)
 
-      length when destination_length === 0 and length === layout_columns ->
-        # destination doesn't exist.  Need to make a new row that has a sentinel, but with the same
-        # content.
-        console
-        |> move_rows(row, destination_row, :sentinel)
-        |> Enum.reverse(tracker.updates)
+        length when destination_length === 0 and length === layout_columns ->
+          # destination doesn't exist.  Need to make a new row that has a sentinel, but with the same
+          # content.
+          console
+          |> move_rows(row, destination_row, :sentinel)
+          |> Enum.reverse(tracker.updates)
 
-      length when length < destination_length ->
-        # destination is overfull, we need to pad.
-        new_updates = console
-        |> move_rows(row, destination_row)
-        |> Enum.reverse(tracker.updates)
+        length when length < destination_length ->
+          # destination is overfull, we need to pad.
+          new_updates =
+            console
+            |> move_rows(row, destination_row)
+            |> Enum.reverse(tracker.updates)
 
-        Enum.reduce((length + 1)..destination_length, new_updates, fn
-          column, so_far -> [{{destination_row, column}, %Cell{}} | so_far]
-        end)
+          Enum.reduce((length + 1)..destination_length, new_updates, fn
+            column, so_far -> [{{destination_row, column}, %Cell{}} | so_far]
+          end)
 
-      length when destination_length === 0 and length < layout_columns ->
-        # destination doesn't exist.   We need to transfer AND pad with a sentinel in
-        # the new row.
+        length when destination_length === 0 and length < layout_columns ->
+          # destination doesn't exist.   We need to transfer AND pad with a sentinel in
+          # the new row.
 
-        new_updates = console
-        |> move_rows(row, destination_row)
-        |> Enum.reverse(tracker.updates)
+          new_updates =
+            console
+            |> move_rows(row, destination_row)
+            |> Enum.reverse(tracker.updates)
 
-        (length + 1)..layout_columns
-        |> Enum.reduce(new_updates, fn
-          column, so_far -> [{{destination_row, column}, %Cell{}} | so_far]
-        end)
-        |> List.insert_at(0, {{destination_row, layout_columns + 1}, Cell.sentinel()})
+          (length + 1)..layout_columns
+          |> Enum.reduce(new_updates, fn
+            column, so_far -> [{{destination_row, column}, %Cell{}} | so_far]
+          end)
+          |> List.insert_at(0, {{destination_row, layout_columns + 1}, Cell.sentinel()})
 
-      _ when destination_length === 0->
-        # destination doesn't exist.  We need to transfer AND pad with a sentinel
+        _ when destination_length === 0 ->
+          # destination doesn't exist.  We need to transfer AND pad with a sentinel
 
-        console
-        |> move_rows(row, destination_row, destination_length)
-        |> Enum.reverse(tracker.updates)
-        |> List.insert_at(0, {{destination_row, layout_columns + 1}, Cell.sentinel()})
+          console
+          |> move_rows(row, destination_row, destination_length)
+          |> Enum.reverse(tracker.updates)
+          |> List.insert_at(0, {{destination_row, layout_columns + 1}, Cell.sentinel()})
 
-      _ ->
-        # destination is underfull but exists, only pull up to destination length
-        console
-        |> move_rows(row, destination_row, destination_length)
-        |> Enum.reverse(tracker.updates)
-    end
+        _ ->
+          # destination is underfull but exists, only pull up to destination length
+          console
+          |> move_rows(row, destination_row, destination_length)
+          |> Enum.reverse(tracker.updates)
+      end
 
     move_succeeding_rows(%{tracker | updates: new_updates}, row + 1, move_distance)
   end
 
   defp update_cursor(tracker, old_cursor, insert_row, move_distance) do
-    new_cursor = case old_cursor do
-      {row, _} when row < insert_row -> old_cursor
-      {row, column} ->
-        {row + move_distance, column}
-    end
+    new_cursor =
+      case old_cursor do
+        {row, _} when row < insert_row ->
+          old_cursor
+
+        {row, column} ->
+          {row + move_distance, column}
+      end
+
     %{tracker | cursor: new_cursor}
   end
 
@@ -300,6 +306,21 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   # special events that are common
+
+  # if we're beyond the last row of the console, go ahead and fill in the rest of the row.
+  # we can defer sending the update because we know that updates from here on are going to be
+  # continuous.
+  defp hard_return(
+         tracker = %{cursor: {row, column}, last_cell: {last_row, _}, layout: {_, columns}}
+       )
+       when row > last_row do
+    updates =
+      column..columns
+      |> Enum.reduce(tracker.updates, &prepend_blank(&2, {row, &1}))
+      |> prepend_sentinel({row, columns + 1})
+
+    %{tracker | cursor: {row + 1, 1}, updates: updates, last_cell: {row + 1, columns}}
+  end
 
   defp hard_return(tracker = %{cursor: {row, _column}}) do
     new_cursor = {row + 1, 1}
@@ -310,9 +331,36 @@ defmodule ExTerm.Console.StringTracker do
     |> Map.merge(%{first_updated: new_cursor, last_updated: new_cursor})
   end
 
+  # if we're beyond the last row of the console, go ahead and fill in to the position of where we are.
+  defp hard_tab(
+         tracker = %{cursor: {row, column}, last_cell: {last_row, _}, layout: {_, columns}},
+         _
+       )
+       when row > last_row do
+    {new_cursor, updates} =
+      case tab_destination(column) do
+        new_column when new_column > columns ->
+          updates =
+            column..columns
+            |> Enum.reduce(tracker.updates, &prepend_blank(&2, {row, &1}))
+            |> prepend_sentinel({row, columns + 1})
+
+          {{row + 1, 1}, updates}
+
+        new_column ->
+          updates =
+            Enum.reduce(column..new_column, tracker.updates, &prepend_blank(&2, {row, &1}))
+
+          {{row, new_column}, updates}
+      end
+
+    %{tracker | cursor: new_cursor, updates: updates, last_cell: {row + 1, columns}}
+  end
+
+  # since we are doing a disjoint update, we should send an update, early.
   defp hard_tab(tracker = %{cursor: {row, column}}, columns) do
     new_cursor =
-      case (div(column, 10) + 1) * 10 do
+      case tab_destination(column) do
         new_column when new_column > columns ->
           {row + 1, 1}
 
@@ -324,5 +372,13 @@ defmodule ExTerm.Console.StringTracker do
     |> Map.put(:cursor, new_cursor)
     |> send_update
     |> Map.merge(%{first_updated: new_cursor, last_updated: new_cursor})
+  end
+
+  # NOTE THE ORDER OF THE ARGUMENTS CAREFULLY
+  defp prepend_blank(updates, location), do: [{location, %Cell{}} | updates]
+  defp prepend_sentinel(updates, location), do: [{location, Cell.sentinel()} | updates]
+
+  defp tab_destination(column) do
+    (div(column, 10) + 1) * 10
   end
 end

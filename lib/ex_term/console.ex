@@ -261,7 +261,6 @@ defmodule ExTerm.Console do
     |> StringTracker.new(line)
     |> StringTracker.insert_string_rows(string)
     |> StringTracker.send_update()
-
     |> Map.get(:console)
   end
 

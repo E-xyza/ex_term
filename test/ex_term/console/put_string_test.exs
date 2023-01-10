@@ -109,7 +109,31 @@ defmodule ExTermTest.Console.PutStringTest do
       end
     end
 
-    test "works when a new line pushes it over the edge"
+    test "works when a new line pushes it over the edge", %{console: console} do
+      Helpers.transaction console, :mutate do
+        Console.move_cursor(console, {5, 1})
+
+        Console.put_string(console, "\n\na")
+
+        assert_receive Console.update_msg(
+                         from: {6, 1},
+                         to: {7, 2},
+                         cursor: {7, 2},
+                         last_cell: {7, 5}
+                       )
+
+        for index <- 1..5 do
+          assert %{char: nil} = Console.get(console, {5, index})
+          assert %{char: nil} = Console.get(console, {6, index})
+        end
+
+        assert %{char: "\n"} = Console.get(console, {5, 6})
+        assert %{char: "\n"} = Console.get(console, {6, 6})
+        assert %{char: "\n"} = Console.get(console, {7, 6})
+
+        assert {7, 2} = Console.get_metadata(console, :cursor)
+      end
+    end
   end
 
   describe "put_string with an intervening special actions" do
