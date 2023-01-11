@@ -33,14 +33,15 @@ defmodule ExTerm.Console do
             | {:public, pid, :ets.table(), :atomics.atomics_ref()}
   @type location :: {pos_integer(), pos_integer()}
   @type update ::
-          {:update, from :: location, to :: location, cursor :: location, last_cell :: location}
+          {:xterm_console_update, from :: location, to :: location, cursor :: location,
+           last_cell :: location}
   @type cellinfo :: {location, Cell.t()}
 
   # message typing
   @type update_msg :: update
   defmacro update_msg(from: from, to: to, cursor: cursor, last_cell: last_cell) do
     quote do
-      {:update, unquote(from), unquote(to), unquote(cursor), unquote(last_cell)}
+      {:xterm_console_update, unquote(from), unquote(to), unquote(cursor), unquote(last_cell)}
     end
   end
 
@@ -50,9 +51,7 @@ defmodule ExTerm.Console do
   def render(assigns) do
     ~H"""
     <div id="exterm-console" phx-update="append">
-      <%= for row <- @rows do %>
-      <Row.render row={row} cursor={@cursor} prompt={@prompt} location="console"/>
-      <% end %>
+      <Cell.render :for={cell <- @cells} cell={cell} cursor={@cursor}/>
     </div>
     """
   end
@@ -70,7 +69,7 @@ defmodule ExTerm.Console do
   defguard spinlock(console) when elem(console, 3)
 
   defguard is_access_ok(console)
-           when permission(console) in [:public, :private] or self() === custodian(console)
+           when permission(console) in [:public, :protected] or self() === custodian(console)
 
   defguard is_mutate_ok(console)
            when permission(console) === :public or self() === custodian(console)
