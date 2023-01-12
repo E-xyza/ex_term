@@ -21,7 +21,6 @@ defmodule ExTerm.Console do
   use MatchSpec
 
   alias ExTerm.Console.Cell
-  alias ExTerm.Console.Row
   alias ExTerm.Console.StringTracker
   alias ExTerm.Style
 
@@ -94,16 +93,8 @@ defmodule ExTerm.Console do
         _ -> {permission, self(), table}
       end
 
-    end_col = columns + 1
-
-    cells =
-      for row <- 1..rows,
-          column <- 1..end_col,
-          do: {{row, column}, %Cell{char: if(column === end_col, do: "\n")}}
-
     transaction(console, :mutate) do
       console
-      |> insert(cells)
       |> put_metadata(
         layout: layout,
         cursor: {1, 1},
@@ -375,6 +366,8 @@ defmodule ExTerm.Console do
 
   Does NOT include the sentinel.  There is always guaranteed to be a sentinel
   on the end of the cell.
+
+  If the table is empty and only contains metadata, returns `{0, 0}`
   """
   defaccess last_cell(console) do
     # the last item in the table encodes the last row because the ordered
@@ -385,6 +378,7 @@ defmodule ExTerm.Console do
     |> :ets.last()
     |> case do
       {row, column} -> {row, column - 1}
+      metadata when is_atom(metadata) -> {0, 0}
     end
   end
 

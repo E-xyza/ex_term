@@ -59,6 +59,7 @@ defmodule ExTerm do
   """
 
   alias ExTerm.Console
+  alias ExTerm.Console.Cell
   alias ExTerm.Console.Helpers
   alias Phoenix.LiveView.JS
 
@@ -178,10 +179,17 @@ defmodule ExTerm do
       case @backend.mount(params, session, socket) do
         {:ok, identifier, console} ->
           # obtain the layout and dump the whole layout.
-          cells =
+          {rows, columns} =
             Helpers.transaction console, :access do
-              {rows, columns} = Console.get_metadata(console, :layout)
-              Console.cells(console, {1, 1}, {rows, columns + 1})
+              Console.get_metadata(console, :layout)
+            end
+
+          # fill the cells with dummy cells that won't be in the initial layout.
+          sentinel_column = columns + 1
+
+          cells =
+            for row <- 1..rows, column <- 1..sentinel_column do
+              {{row, column}, %Cell{char: if(column === sentinel_column, do: "\n")}}
             end
 
           new_socket =

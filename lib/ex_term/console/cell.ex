@@ -9,7 +9,8 @@ defmodule ExTerm.Console.Cell do
     sentinel_class =
       case cell.char do
         "\n" -> "exterm-cell-sentinel"
-        c when c in [nil, " "] -> "exterm-cell-space"
+        " " -> "exterm-cell-space"
+        nil -> "exterm-cell-blank"
         _ -> nil
       end
 
