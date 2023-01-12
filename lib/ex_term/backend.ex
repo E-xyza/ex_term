@@ -4,7 +4,7 @@ defmodule ExTerm.Backend do
   @type id :: term
   @type json :: boolean | nil | String.t() | number | [json] | %{optional(String.t()) => json}
 
-  @type response :: :ok | Console.update()
+  @type response :: :ok | {:ok, Console.update()} | {:ok, assigns :: keyword}
 
   @callback mount(json, json, LiveView.socket()) :: {:ok, id, Console.t()}
 
@@ -15,4 +15,12 @@ defmodule ExTerm.Backend do
   @callback handle_keyup(id, key :: String.t()) :: response
   @callback handle_paste(id, String.t()) :: response
   @callback handle_io_request(id, GenServer.from(), term) :: response
+  @callback handle_update(
+              id,
+              console :: Console.t,
+              from :: Console.location(),
+              to :: Console.location(),
+              cursor :: Console.location(),
+              last_cell :: Console.location()
+            ) :: :ok | {:ok, assigns :: keyword}
 end

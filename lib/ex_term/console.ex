@@ -51,7 +51,7 @@ defmodule ExTerm.Console do
   def render(assigns) do
     ~H"""
     <div id="exterm-console" phx-update="append">
-      <Cell.render :for={cell <- @cells} cell={cell} cursor={@cursor}/>
+      <Cell.render :for={cell <- @cells} cell={cell} cursor={@cursor} prompt={@prompt}/>
     </div>
     """
   end

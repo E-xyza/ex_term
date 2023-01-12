@@ -34,6 +34,7 @@ defmodule ExTerm.Console.Helpers do
       quote do
         console when not is_access_ok(console) ->
           %{module: module, function: {fun, arity}} = __ENV__
+
           raise "transaction in function #{module}.#{fun}/#{arity} running on #{inspect(self())} doesn't have access to #{permission(console)} console which is the responsibility of #{inspect(custodian(console))}"
       end
 
@@ -41,6 +42,7 @@ defmodule ExTerm.Console.Helpers do
       quote do
         {console, :mutate} when not is_mutate_ok(console) ->
           %{module: module, function: {fun, arity}} = __ENV__
+
           raise "transaction in function #{module}.#{fun}/#{arity} running on #{inspect(self())} cannot mutate #{permission(console)} console which is the responsibility of #{inspect(custodian(console))}"
       end
 

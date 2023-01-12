@@ -37,13 +37,13 @@ div#exterm-anchor {
     height: 1px;
 }
 
-div.exterm.exterm-blurred span.exterm-cursor.exterm-cursor {
+div.exterm.exterm-blurred span.exterm-cursor-active {
     border-color: white;
     border-width: 1px;
     border-style: solid;
 }
 
-div.exterm.exterm-focused span.exterm-cursor.exterm-cursor {
+div.exterm.exterm-focused span.exterm-cursor-active {
     animation: blinker 1s linear infinite;
 }
 
@@ -53,6 +53,10 @@ span.exterm-cell {
 }
 
 span.exterm-cell-sentinel {
+    white-space: pre;
+}
+
+span.exterm-cell-space {
     white-space: pre;
 }
 

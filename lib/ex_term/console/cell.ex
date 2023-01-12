@@ -4,13 +4,25 @@ defmodule ExTerm.Console.Cell do
   use Phoenix.Component
 
   def render(assigns = %{cell: {location = {row, column}, cell}, cursor: cursor}) do
-    sentinel_class = if cell.char === "\n", do: "exterm-cell-sentinel"
-    cursor_class = if location === cursor, do: "exterm-cell-cursor"
+    char = cell.char || " "
+    
+    sentinel_class = case cell.char do
+      "\n" -> "exterm-cell-sentinel"
+      c when c in [nil, " "] -> "exterm-cell-space"
+      _ -> nil
+    end
+
+    cursor_class = case {location === cursor, assigns.prompt} do
+      {true, true} -> "exterm-cursor-active"
+      {true, _} -> "exterm-cursor"
+      _ -> nil
+    end
+
     class = ["exterm-cell", sentinel_class, cursor_class]
 
-    assigns = assign(assigns, id: "exterm-cell-#{row}-#{column}", class: class, cell: cell)
+    assigns = %{id: "exterm-cell-#{row}-#{column}", class: class, style: cell.style, char: char}
 
-    ~H"<span id={@id} class={@class} style={@cell.style}><%= @cell.char %></span>"
+    ~H"<span id={@id} class={@class} style={@style}><%= @char %></span>"
   end
 
   alias ExTerm.Style

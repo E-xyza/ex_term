@@ -69,7 +69,7 @@ defmodule ExTerm do
     ~H"""
     <div id="exterm-terminal" class={class_for(@focus)} phx-keydown="keydown" phx-focus="focus" phx-blur="blur" tabindex="0">
       <div id="exterm-container">
-        <Console.render :if={@console} cells={@cells} cursor={@cursor}/>
+        <Console.render :if={@console} cells={@cells} cursor={@cursor} prompt={@prompt}/>
       </div>
     </div>
     <div id="exterm-paste-target" phx-click="paste"/>
@@ -174,31 +174,34 @@ defmodule ExTerm do
     if connected?(socket) do
       case @backend.mount(params, session, socket) do
         {:ok, identifier, console} ->
+          # obtain the layout and dump the whole layout.
+          cells =
+            Helpers.transaction console, :access do
+              {rows, columns} = Console.get_metadata(console, :layout)
+              Console.cells(console, {1, 1}, {rows, columns + 1})
+            end
+
           new_socket =
             socket
-            |> set_cursor
-            |> set_focus
-            |> set_console(console)
-            |> assign(backend: @backend, identifier: identifier)
+            |> init(console)
+            |> assign(backend: @backend, identifier: identifier, cells: cells)
 
-          # obtain the layout and dump the whole layout.
-          cells = Helpers.transaction(console, :access) do
-            {rows, columns} = Console.get_metadata(console, :layout)
-            Console.cells(console, {1, 1}, {rows, columns + 1})
-          end
-
-          {:ok, new_socket, temporary_assigns: [cells: cells]}
+          {:ok, new_socket, temporary_assigns: [cells: []]}
       end
     else
-      new_socket = socket
-      |> set_console
-      |> set_focus
-      
-      {:ok, new_socket}
+      {:ok, init(socket), temporary_assigns: [cells: []]}
     end
   end
 
   # reducers
+  defp init(socket, console \\ nil) do
+    socket
+    |> set_cursor
+    |> set_focus
+    |> set_prompt
+    |> set_console(console)
+  end
+
   defp set_cursor(socket, cursor \\ {1, 1}) do
     assign(socket, cursor: cursor)
   end
@@ -207,7 +210,21 @@ defmodule ExTerm do
     assign(socket, focus: focus)
   end
 
-  defp set_console(socket, console \\ nil) do
+  defp set_prompt(socket, prompt \\ false)
+
+  defp set_prompt(socket = %{assigns: %{console: console, cursor: cursor}}, prompt) do
+    cell = Helpers.transaction(console, :access) do
+      Console.get(console, cursor)
+    end
+
+    assign(socket, prompt: prompt, cells: [{cursor, cell}])
+  end
+
+  defp set_prompt(socket, false) do
+    assign(socket, prompt: false)
+  end
+
+  defp set_console(socket, console) do
     assign(socket, console: console)
   end
 
@@ -241,19 +258,15 @@ defmodule ExTerm do
     dispatch(:handle_io_request, [{pid, ref}, request], socket)
   end
 
-  def handle_info(Console.update_msg(from: from, to: to, cursor: cursor, last_cell: _), socket) do
-    console = socket.assigns.console
+  def handle_info(
+        Console.update_msg(from: from, to: to, cursor: cursor, last_cell: last_cell),
+        socket
+      ) do
+    dispatch(:handle_update, [socket.assigns.console, from, to, cursor, last_cell], socket)
+  end
 
-    cells = Helpers.transaction(console, :access) do
-      Console.cells(console, from, to)
-    end
-
-    new_socket =
-      socket
-      |> set_cursor(cursor)
-      |> assign(cells: cells)
-
-    {:noreply, new_socket}
+  def handle_info({:prompt, activity}, socket) when activity in [:active, :inactive] do
+    {:noreply, set_prompt(socket, activity === :active)}
   end
 
   defp dispatch(what, payload, socket = %{assigns: %{backend: backend, identifier: identifier}}) do
@@ -261,8 +274,11 @@ defmodule ExTerm do
       :ok ->
         {:noreply, socket}
 
-      update_msg = Console.update_msg(from: _, to: _, cursor: _, last_cell: _) ->
-        handle_info(update_msg, socket)
+      {:ok, Console.update_msg(from: from, to: to, cursor: cursor, last_cell: last_cell)} ->
+        dispatch(:handle_update, [socket.assigns.console, from, to, cursor, last_cell], socket)
+
+      {:ok, assigns} ->
+        {:noreply, assign(socket, assigns)}
     end
   end
 
