@@ -5,18 +5,20 @@ defmodule ExTerm.Console.Cell do
 
   def render(assigns = %{cell: {location = {row, column}, cell}, cursor: cursor}) do
     char = cell.char || " "
-    
-    sentinel_class = case cell.char do
-      "\n" -> "exterm-cell-sentinel"
-      c when c in [nil, " "] -> "exterm-cell-space"
-      _ -> nil
-    end
 
-    cursor_class = case {location === cursor, assigns.prompt} do
-      {true, true} -> "exterm-cursor-active"
-      {true, _} -> "exterm-cursor"
-      _ -> nil
-    end
+    sentinel_class =
+      case cell.char do
+        "\n" -> "exterm-cell-sentinel"
+        c when c in [nil, " "] -> "exterm-cell-space"
+        _ -> nil
+      end
+
+    cursor_class =
+      case {location === cursor, assigns.prompt} do
+        {true, true} -> "exterm-cursor-active"
+        {true, _} -> "exterm-cursor"
+        _ -> nil
+      end
 
     class = ["exterm-cell", sentinel_class, cursor_class]
 

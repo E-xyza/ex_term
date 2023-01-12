@@ -213,9 +213,10 @@ defmodule ExTerm do
   defp set_prompt(socket, prompt \\ false)
 
   defp set_prompt(socket = %{assigns: %{console: console, cursor: cursor}}, prompt) do
-    cell = Helpers.transaction(console, :access) do
-      Console.get(console, cursor)
-    end
+    cell =
+      Helpers.transaction console, :access do
+        Console.get(console, cursor)
+      end
 
     assign(socket, prompt: prompt, cells: [{cursor, cell}])
   end

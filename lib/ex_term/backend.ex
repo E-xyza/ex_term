@@ -17,7 +17,7 @@ defmodule ExTerm.Backend do
   @callback handle_io_request(id, GenServer.from(), term) :: response
   @callback handle_update(
               id,
-              console :: Console.t,
+              console :: Console.t(),
               from :: Console.location(),
               to :: Console.location(),
               cursor :: Console.location(),

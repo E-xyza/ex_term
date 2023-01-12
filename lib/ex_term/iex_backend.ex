@@ -4,6 +4,7 @@ defmodule ExTerm.IexBackend do
   alias ExTerm.Backend
   alias ExTerm.Console
   alias ExTerm.Console.Helpers
+  alias ExTerm.IexBackend.Prompt
   alias Phoenix.PubSub
 
   require Helpers
@@ -12,12 +13,13 @@ defmodule ExTerm.IexBackend do
   use GenServer
 
   @enforce_keys [:console, :pubsub_topic]
-  defstruct @enforce_keys ++ [prompting?: false]
+  defstruct @enforce_keys ++ [:prompt, flags: MapSet.new()]
 
   @type state :: %__MODULE__{
           console: Console.t(),
-          prompting?: boolean,
-          pubsub_topic: String.t()
+          prompt: nil | GenServer.reply(),
+          pubsub_topic: String.t(),
+          flags: MapSet.t(String.t())
         }
 
   @pubsub_server ExTerm.PubSub
@@ -74,7 +76,7 @@ defmodule ExTerm.IexBackend do
         {_, columns} when dimension === :columns -> columns
       end
 
-    ExTerm.io_reply(from, reply)
+    ExTerm.io_reply(from, {:ok, reply})
   end
 
   @impl Backend
@@ -85,36 +87,78 @@ defmodule ExTerm.IexBackend do
 
   ## ROUTER: HANDLE_IO
   def handle_io_request(from, {:put_chars, :unicode, str}, state = %{console: console}) do
-    if state.prompting? do
+    if state.prompt do
       raise "not yet"
     else
       Helpers.transaction console, :mutate do
         Console.put_string(console, str)
       end
-    end
 
-    ExTerm.io_reply(from)
-    {:noreply, %{state | prompting?: true}}
+      ExTerm.io_reply(from)
+      {:noreply, state}
+    end
   end
 
   def handle_io_request(from, {:get_line, :unicode, prompt}, state = %{console: console}) do
-    Helpers.transaction console, :mutate do
-      Console.put_string(console, prompt)
-    end
+    cursor =
+      Helpers.transaction console, :mutate do
+        Console.put_string(console, prompt)
+        Console.get_metadata(console, :cursor)
+      end
 
     broadcast_update({:prompt, :active}, @pubsub_server, state.pubsub_topic)
-    {:noreply, %{state | prompting?: true}}
+    {:noreply, %{state | prompt: Prompt.new(from, cursor, console)}}
   end
 
   def handle_io_request(from, {:get_geometry, type}, state) do
     get_geometry_impl(from, type, state)
+    {:noreply, state}
   end
 
   @impl Backend
   def handle_update(_, console, from, to, cursor, _) do
-    Helpers.transaction(console, :access) do
+    Helpers.transaction console, :access do
       {:ok, cells: Console.cells(console, from, to), cursor: cursor}
     end
+  end
+
+  @impl Backend
+  def handle_keydown(pid, key), do: GenServer.call(pid, {:handle_keydown, key})
+
+  defp handle_keydown_impl(key, _from, state) do
+    case String.next_grapheme(key) do
+      {^key, ""} ->
+        {:reply, :ok, %{state | prompt: Prompt.push(state.prompt, key)}}
+
+      _ ->
+        special_keydown(key, state)
+    end
+  end
+
+  defp special_keydown("Enter", state) do
+    {:reply, :ok, %{state | prompt: Prompt.submit(state.prompt)}}
+  end
+
+  defp special_keydown("Backspace", state) do
+    {:reply, :ok, %{state | prompt: Prompt.backspace(state.prompt)}}
+  end
+
+  defp special_keydown("ArrowLeft", state) do
+    {:reply, :ok, %{state | prompt: Prompt.left(state.prompt)}}
+  end
+
+  defp special_keydown("ArrowRight", state) do
+    {:reply, :ok, %{state | prompt: Prompt.right(state.prompt)}}
+  end
+
+  @flagkeys ~w(Alt AltGraph CapsLock Control Fn Hyper Meta Shift Super Symbol)
+
+  defp special_keydown(key, state) when key in @flagkeys do
+    {:reply, :ok, %{state | flags: MapSet.put(state.flags, key)}}
+  end
+
+  defp special_keydown(other, _state) do
+    raise "#{other} not supported yet"
   end
 
   @impl GenServer
@@ -125,6 +169,7 @@ defmodule ExTerm.IexBackend do
   ### ROUTER
   @impl GenServer
   def handle_call(:get_console, from, state), do: get_console_impl(from, state)
+  def handle_call({:handle_keydown, key}, from, state), do: handle_keydown_impl(key, from, state)
 
   ### UTILITIES
   defp pubsub_topic(pid) do
