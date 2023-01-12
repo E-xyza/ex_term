@@ -36,10 +36,11 @@ defmodule ExTerm.IexBackend do
     # TODO: move this to a DynamicSupervisor.
     backend = self()
 
-    {:ok, shell} = Task.start_link(fn ->
-      :erlang.group_leader(backend, self())
-      IEx.Server.run([])
-    end)
+    {:ok, shell} =
+      Task.start_link(fn ->
+        :erlang.group_leader(backend, self())
+        IEx.Server.run([])
+      end)
 
     pubsub_topic = pubsub_topic(backend)
 
@@ -153,23 +154,30 @@ defmodule ExTerm.IexBackend do
   end
 
   defp special_keydown("Tab", state = %{console: console, prompt: %{location: {row, column}}}) do
-    new_row = state.prompt.precursor
-    |> Enum.flat_map(&String.to_charlist/1)
-    |> IEx.Autocomplete.expand()
-    |> case do
-      {:no, _, _} -> row
-      {:yes, _, list_of_options} ->
-        options = Enum.join(list_of_options, "\t")
-        Helpers.transaction(console, :mutate) do
-          {init_row, _} = Console.get_metadata(console, :cursor)
-          {end_row, _} = console
-          |> Console.insert_string(options, row)
-          |> Console.get_metadata(:cursor)
+    new_row =
+      state.prompt.precursor
+      |> Enum.flat_map(&String.to_charlist/1)
+      |> IEx.Autocomplete.expand()
+      |> case do
+        {:no, _, _} ->
+          row
 
-          # rows added
-          row + end_row - init_row
-        end
+        {:yes, _, list_of_options} ->
+          options = Enum.join(list_of_options, "\t")
+
+          Helpers.transaction console, :mutate do
+            {init_row, _} = Console.get_metadata(console, :cursor)
+
+            {end_row, _} =
+              console
+              |> Console.insert_string(options, row)
+              |> Console.get_metadata(:cursor)
+
+            # rows added
+            row + end_row - init_row
+          end
       end
+
     {:reply, :ok, %{state | prompt: %{state.prompt | location: {new_row, column}}}}
   end
 

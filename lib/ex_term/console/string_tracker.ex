@@ -91,7 +91,8 @@ defmodule ExTerm.Console.StringTracker do
         # figure out how many rows we need to move.  This is determined by the number
         # of rows in the update.  Let's assume that it is the row of the first item.
 
-        move_distance = last_row - row + 1
+        move_distance =
+          (last_row - row + 1)
 
         done
         |> pad_last_row(columns)
@@ -109,9 +110,11 @@ defmodule ExTerm.Console.StringTracker do
     end
   end
 
-  def put_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string) when column > columns do
+  def put_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string)
+      when column > columns do
     # make sure the update contains a sentinel at the cursor location.
-    {%{tracker | cursor: {row + 1, 1}, updates: [{cursor, Cell.sentinel()} | tracker.updates]}, string}
+    {%{tracker | cursor: {row + 1, 1}, updates: [{cursor, Cell.sentinel()} | tracker.updates]},
+     string}
   end
 
   def put_string_row(tracker, columns, "\t" <> rest) do
