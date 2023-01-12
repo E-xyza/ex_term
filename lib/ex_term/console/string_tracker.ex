@@ -60,21 +60,14 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   @spec put_string_rows(t(), String.t()) :: t()
-  def put_string_rows(tracker = %{cursor: {row, _}, insertion: nil}, string) do
+  def put_string_rows(tracker = %{insertion: nil}, string) do
     # NB: don't cache the number of rows.  Row length should be fixed once set.
-    columns =
-      case Console.columns(tracker.console, row) do
-        0 ->
-          elem(tracker.layout, 1)
-
-        columns ->
-          columns
-      end
+    columns = columns_for_row(tracker)
 
     case put_string_row(tracker, columns, string) do
       # exhausted the row without finishing the string
       {updated_tracker, leftover} ->
-        put_string_rows(%{updated_tracker | cursor: {row + 1, 1}}, leftover)
+        put_string_rows(updated_tracker, leftover)
 
       done ->
         done
@@ -85,10 +78,15 @@ defmodule ExTerm.Console.StringTracker do
 
   @spec insert_string_rows(t(), String.t()) :: t()
   def insert_string_rows(tracker = %{insertion: row}, string) when is_integer(row) do
-    # NB: don't cache the number of rows.  Row length should be fixed once set.
-    columns = Console.columns(tracker.console, row)
+    # NB: don't cache the number of columns.  Row length should be fixed based
+    # on the existing capacity of the columns so far.
+
+    columns = columns_for_row(tracker)
 
     case put_string_row(tracker, columns, string) do
+      {new_tracker, leftover} ->
+        insert_string_rows(new_tracker, leftover)
+
       done = %{updates: [{{last_row, _}, _} | _]} ->
         # figure out how many rows we need to move.  This is determined by the number
         # of rows in the update.  Let's assume that it is the row of the first item.
@@ -101,6 +99,21 @@ defmodule ExTerm.Console.StringTracker do
         |> update_cursor(tracker.old_cursor, row, move_distance)
         |> update_insert()
     end
+  end
+
+  defp columns_for_row(tracker = %{console: console, cursor: {row, _}, layout: layout}) do
+    case Console.columns(console, row) do
+      # this row doesn't exist yet.
+      0 -> elem(layout, 1)
+      columns -> columns
+    end
+  end
+
+  def put_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string)
+      when column > columns do
+    # make sure the update contains a sentinel at the cursor location.
+    {%{tracker | cursor: {row + 1, 1}, updates: [{cursor, Cell.sentinel()} | tracker.updates]},
+     string}
   end
 
   def put_string_row(tracker, columns, "\t" <> rest) do
@@ -307,13 +320,15 @@ defmodule ExTerm.Console.StringTracker do
 
   # special events that are common
 
-  # if we're beyond the last row of the console, go ahead and fill in the rest of the row.
-  # we can defer sending the update because we know that updates from here on are going to be
-  # continuous.
+  defguardp is_inserting(tracker) when tracker.insertion !== nil
+
+  # if we're beyond the last row of the console (or doing an insertion), go ahead and
+  # fill in the rest of the row.  In both cases, we can defer sending the update because
+  # we know that updates from here on are going to be continuous.
   defp hard_return(
          tracker = %{cursor: {row, column}, last_cell: {last_row, _}, layout: {_, columns}}
        )
-       when row > last_row do
+       when row > last_row or is_inserting(tracker) do
     updates =
       column..columns
       |> Enum.reduce(tracker.updates, &prepend_blank(&2, {row, &1}))
@@ -331,30 +346,35 @@ defmodule ExTerm.Console.StringTracker do
     |> Map.merge(%{first_updated: new_cursor, last_updated: new_cursor})
   end
 
-  # if we're beyond the last row of the console, go ahead and fill in to the position of where we are.
+  # if we're beyond the last row of the console (or doing an insertion), go
+  # ahead and fill in to the position of where we are.
   defp hard_tab(
-         tracker = %{cursor: {row, column}, last_cell: {last_row, _}, layout: {_, columns}},
+         tracker = %{
+           cursor: {row, column},
+           last_cell: last_cell = {last_row, _},
+           layout: {_, columns}
+         },
          _
        )
-       when row > last_row do
-    {new_cursor, updates} =
+       when row > last_row or is_inserting(tracker) do
+    {new_cursor, updates, new_last_cell} =
       case tab_destination(column) do
-        new_column when new_column > columns ->
+        new_column when new_column >= columns ->
           updates =
             column..columns
             |> Enum.reduce(tracker.updates, &prepend_blank(&2, {row, &1}))
             |> prepend_sentinel({row, columns + 1})
 
-          {{row + 1, 1}, updates}
+          {{row + 1, 1}, updates, {last_row, columns}}
 
         new_column ->
           updates =
-            Enum.reduce(column..new_column, tracker.updates, &prepend_blank(&2, {row, &1}))
+            Enum.reduce(column..(new_column - 1), tracker.updates, &prepend_blank(&2, {row, &1}))
 
-          {{row, new_column}, updates}
+          {{row, new_column}, updates, last_cell}
       end
 
-    %{tracker | cursor: new_cursor, updates: updates, last_cell: {row + 1, columns}}
+    %{tracker | cursor: new_cursor, updates: updates, last_cell: new_last_cell}
   end
 
   # since we are doing a disjoint update, we should send an update, early.

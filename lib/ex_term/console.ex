@@ -21,7 +21,6 @@ defmodule ExTerm.Console do
   use MatchSpec
 
   alias ExTerm.Console.Cell
-  alias ExTerm.Console.Row
   alias ExTerm.Console.StringTracker
   alias ExTerm.Style
 
@@ -94,16 +93,8 @@ defmodule ExTerm.Console do
         _ -> {permission, self(), table}
       end
 
-    end_col = columns + 1
-
-    cells =
-      for row <- 1..rows,
-          column <- 1..end_col,
-          do: {{row, column}, %Cell{char: if(column === end_col, do: "\n")}}
-
     transaction(console, :mutate) do
       console
-      |> insert(cells)
       |> put_metadata(
         layout: layout,
         cursor: {1, 1},
@@ -243,9 +234,9 @@ defmodule ExTerm.Console do
     |> Map.get(:console)
   end
 
-  @spec insert_string(t, String.t(), line :: pos_integer()) :: t
+  @spec insert_string(t, String.t(), row :: pos_integer()) :: t
   @doc """
-  `inserts` a string at a certain line.
+  `inserts` a string at a certain row.
 
   This will "push down" as many lines as is necessary to insert the string.
   If the current cursor precedes the insertion point, it will be unaffected.
@@ -255,9 +246,9 @@ defmodule ExTerm.Console do
 
   An ANSI "clear" operation only clears the region inserted so far.
   """
-  def insert_string(console, string, line) do
+  def insert_string(console, string, row) do
     console
-    |> StringTracker.new(line)
+    |> StringTracker.new(row)
     |> StringTracker.insert_string_rows(string)
     |> StringTracker.send_update()
     |> Map.get(:console)
@@ -375,6 +366,8 @@ defmodule ExTerm.Console do
 
   Does NOT include the sentinel.  There is always guaranteed to be a sentinel
   on the end of the cell.
+
+  If the table is empty and only contains metadata, returns `{0, 0}`
   """
   defaccess last_cell(console) do
     # the last item in the table encodes the last row because the ordered
@@ -385,6 +378,7 @@ defmodule ExTerm.Console do
     |> :ets.last()
     |> case do
       {row, column} -> {row, column - 1}
+      metadata when is_atom(metadata) -> {0, 0}
     end
   end
 

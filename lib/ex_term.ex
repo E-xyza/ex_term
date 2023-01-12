@@ -59,7 +59,10 @@ defmodule ExTerm do
   """
 
   alias ExTerm.Console
+  alias ExTerm.Console.Cell
   alias ExTerm.Console.Helpers
+  alias Phoenix.LiveView.JS
+
   require Console
   require Helpers
 
@@ -67,10 +70,9 @@ defmodule ExTerm do
 
   def render(assigns) do
     ~H"""
-    <div id="exterm-terminal" class={class_for(@focus)} phx-keydown="keydown" phx-focus="focus" phx-blur="blur" tabindex="0">
-      <div id="exterm-container">
-        <Console.render :if={@console} cells={@cells} cursor={@cursor} prompt={@prompt}/>
-      </div>
+    <div id="exterm-terminal" contenteditable class={class_for(@focus)} phx-keydown="keydown" phx-focus="focus" phx-blur="blur" tabindex="0">
+      <Console.render :if={@console} cells={@cells} cursor={@cursor} prompt={@prompt}/>
+      <div :if={@console} id="exterm-anchor" phx-mounted={JS.dispatch("exterm:mounted", to: "#exterm-terminal")}/>
     </div>
     <div id="exterm-paste-target" phx-click="paste"/>
 
@@ -79,7 +81,16 @@ defmodule ExTerm do
       (() => {
         const terminal = document.getElementById("exterm-terminal");
         const paste_target = document.getElementById("exterm-paste-target")
-        terminal.addEventListener("exterm:mounted", event => event.target.scroll(0, 5));
+        terminal.addEventListener("exterm:mounted", event => {
+          setTimeout(() => event.target.scroll(0, 30), 100);
+        })
+
+        terminal.addEventListener("keydown", event =>
+          {
+            // prevents the default event from firing (this is mostly tab focusing,
+            // but also contenteditable changes)
+            event.preventDefault();
+          })
 
         const rowCol = (node) => {
           var id;
@@ -175,10 +186,17 @@ defmodule ExTerm do
       case @backend.mount(params, session, socket) do
         {:ok, identifier, console} ->
           # obtain the layout and dump the whole layout.
-          cells =
+          {rows, columns} =
             Helpers.transaction console, :access do
-              {rows, columns} = Console.get_metadata(console, :layout)
-              Console.cells(console, {1, 1}, {rows, columns + 1})
+              Console.get_metadata(console, :layout)
+            end
+
+          # fill the cells with dummy cells that won't be in the initial layout.
+          sentinel_column = columns + 1
+
+          cells =
+            for row <- 1..rows, column <- 1..sentinel_column do
+              {{row, column}, %Cell{char: if(column === sentinel_column, do: "\n")}}
             end
 
           new_socket =

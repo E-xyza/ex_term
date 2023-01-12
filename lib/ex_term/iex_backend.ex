@@ -12,13 +12,14 @@ defmodule ExTerm.IexBackend do
   @behaviour Backend
   use GenServer
 
-  @enforce_keys [:console, :pubsub_topic]
+  @enforce_keys [:console, :pubsub_topic, :shell]
   defstruct @enforce_keys ++ [:prompt, flags: MapSet.new()]
 
   @type state :: %__MODULE__{
           console: Console.t(),
-          prompt: nil | GenServer.reply(),
           pubsub_topic: String.t(),
+          shell: pid,
+          prompt: nil | GenServer.reply(),
           flags: MapSet.t(String.t())
         }
 
@@ -35,16 +36,17 @@ defmodule ExTerm.IexBackend do
     # TODO: move this to a DynamicSupervisor.
     backend = self()
 
-    Task.start_link(fn ->
-      :erlang.group_leader(backend, self())
-      IEx.Server.run([])
-    end)
+    {:ok, shell} =
+      Task.start_link(fn ->
+        :erlang.group_leader(backend, self())
+        IEx.Server.run([])
+      end)
 
     pubsub_topic = pubsub_topic(backend)
 
     console = Console.new(handle_update: &broadcast_update(&1, @pubsub_server, pubsub_topic))
 
-    {:ok, %__MODULE__{console: console, pubsub_topic: pubsub_topic}}
+    {:ok, %__MODULE__{console: console, pubsub_topic: pubsub_topic, shell: shell}}
   end
 
   @impl Backend
@@ -149,6 +151,41 @@ defmodule ExTerm.IexBackend do
 
   defp special_keydown("ArrowRight", state) do
     {:reply, :ok, %{state | prompt: Prompt.right(state.prompt)}}
+  end
+
+  defp special_keydown("Tab", state = %{console: console, prompt: prompt = %{location: {row, column}}}) do
+    {new_prompt, new_row} =
+      prompt.precursor
+      |> Enum.flat_map(&String.to_charlist/1)
+      |> IEx.Autocomplete.expand()
+      |> case do
+        {:no, _, _} ->
+          {prompt, row}
+
+        {:yes, [], list_of_options} ->
+          options = Enum.join(list_of_options, "\t")
+
+          Helpers.transaction console, :mutate do
+            {init_row, _} = Console.get_metadata(console, :cursor)
+
+            {end_row, _} =
+              console
+              |> Console.insert_string(options, row)
+              |> Console.get_metadata(:cursor)
+
+            # rows added
+            {prompt, row + end_row - init_row}
+          end
+
+        {:yes, one_option, []} ->
+          new_prompt = Prompt.autocomplete_one(prompt, one_option)
+          {row, _} = Helpers.transaction console, :access do
+            Console.get_metadata(console, :cursor)
+          end
+          {new_prompt, row}
+      end
+
+    {:reply, :ok, %{state | prompt: %{new_prompt | location: {new_row, column}}}}
   end
 
   @flagkeys ~w(Alt AltGraph CapsLock Control Fn Hyper Meta Shift Super Symbol)

@@ -66,6 +66,15 @@ defmodule ExTerm.IexBackend.Prompt do
     nil
   end
 
+  def autocomplete_one(prompt = %{console: console}, autocompletion) do
+    precursor =
+      autocompletion
+      |> Enum.map(&List.to_string([&1]))
+      |> Enum.reverse(prompt.precursor)
+
+    paint(%{prompt | precursor: precursor})
+  end
+
   defp paint(prompt = %{console: console}, extras \\ nil) do
     Helpers.transaction console, :mutate do
       precursor =

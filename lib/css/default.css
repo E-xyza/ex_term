@@ -16,19 +16,17 @@ div#exterm-terminal {
     font-family: courier-new, courier, monospace;
     font-size: 15px;
     width: 100ch;
-    height: 480px;
+    height: 579px;
     position: relative;
     overflow-y: scroll;
 }
 
-div#exterm-buffer {
-    overflow-anchor: none;
-    position: relative;
-}
-
 div#exterm-console {
     overflow-anchor: none;
-    position: relative;
+}
+
+span.exterm-cell {
+    overflow-anchor: none;
 }
 
 div#exterm-anchor {
@@ -48,7 +46,6 @@ div.exterm.exterm-focused span.exterm-cursor-active {
 }
 
 span.exterm-cell {
-    width: 1ch;
     height: 20px;
 }
 
@@ -57,6 +54,10 @@ span.exterm-cell-sentinel {
 }
 
 span.exterm-cell-space {
+    white-space: pre;
+}
+
+span.exterm-cell-blank {
     white-space: pre;
 }
 
