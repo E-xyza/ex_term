@@ -60,21 +60,14 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   @spec put_string_rows(t(), String.t()) :: t()
-  def put_string_rows(tracker = %{cursor: {row, _}, insertion: nil}, string) do
+  def put_string_rows(tracker = %{insertion: nil}, string) do
     # NB: don't cache the number of rows.  Row length should be fixed once set.
-    columns =
-      case Console.columns(tracker.console, row) do
-        0 ->
-          elem(tracker.layout, 1)
-
-        columns ->
-          columns
-      end
+    columns = columns_for_row(tracker)
 
     case put_string_row(tracker, columns, string) do
       # exhausted the row without finishing the string
       {updated_tracker, leftover} ->
-        put_string_rows(%{updated_tracker | cursor: {row + 1, 1}}, leftover)
+        put_string_rows(updated_tracker, leftover)
 
       done ->
         done
@@ -85,10 +78,15 @@ defmodule ExTerm.Console.StringTracker do
 
   @spec insert_string_rows(t(), String.t()) :: t()
   def insert_string_rows(tracker = %{insertion: row}, string) when is_integer(row) do
-    # NB: don't cache the number of rows.  Row length should be fixed once set.
-    columns = Console.columns(tracker.console, row)
+    # NB: don't cache the number of columns.  Row length should be fixed based
+    # on the existing capacity of the columns so far.
+
+    columns = columns_for_row(tracker)
 
     case put_string_row(tracker, columns, string) do
+      {new_tracker, leftover} ->
+        insert_string_rows(new_tracker, leftover)
+
       done = %{updates: [{{last_row, _}, _} | _]} ->
         # figure out how many rows we need to move.  This is determined by the number
         # of rows in the update.  Let's assume that it is the row of the first item.
@@ -101,6 +99,19 @@ defmodule ExTerm.Console.StringTracker do
         |> update_cursor(tracker.old_cursor, row, move_distance)
         |> update_insert()
     end
+  end
+
+  defp columns_for_row(tracker = %{console: console, cursor: {row, _}, layout: layout}) do
+    case Console.columns(console, row) do
+      # this row doesn't exist yet.
+      0 -> elem(layout, 1)
+      columns -> columns
+    end
+  end
+
+  def put_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string) when column > columns do
+    # make sure the update contains a sentinel at the cursor location.
+    {%{tracker | cursor: {row + 1, 1}, updates: [{cursor, Cell.sentinel()} | tracker.updates]}, string}
   end
 
   def put_string_row(tracker, columns, "\t" <> rest) do

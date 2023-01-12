@@ -243,9 +243,9 @@ defmodule ExTerm.Console do
     |> Map.get(:console)
   end
 
-  @spec insert_string(t, String.t(), line :: pos_integer()) :: t
+  @spec insert_string(t, String.t(), row :: pos_integer()) :: t
   @doc """
-  `inserts` a string at a certain line.
+  `inserts` a string at a certain row.
 
   This will "push down" as many lines as is necessary to insert the string.
   If the current cursor precedes the insertion point, it will be unaffected.
@@ -255,9 +255,9 @@ defmodule ExTerm.Console do
 
   An ANSI "clear" operation only clears the region inserted so far.
   """
-  def insert_string(console, string, line) do
+  def insert_string(console, string, row) do
     console
-    |> StringTracker.new(line)
+    |> StringTracker.new(row)
     |> StringTracker.insert_string_rows(string)
     |> StringTracker.send_update()
     |> Map.get(:console)

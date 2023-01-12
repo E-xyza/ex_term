@@ -60,6 +60,8 @@ defmodule ExTerm do
 
   alias ExTerm.Console
   alias ExTerm.Console.Helpers
+  alias Phoenix.LiveView.JS
+
   require Console
   require Helpers
 
@@ -68,9 +70,8 @@ defmodule ExTerm do
   def render(assigns) do
     ~H"""
     <div id="exterm-terminal" class={class_for(@focus)} phx-keydown="keydown" phx-focus="focus" phx-blur="blur" tabindex="0">
-      <div id="exterm-container">
-        <Console.render :if={@console} cells={@cells} cursor={@cursor} prompt={@prompt}/>
-      </div>
+      <Console.render :if={@console} cells={@cells} cursor={@cursor} prompt={@prompt}/>
+      <div :if={@console} id="exterm-anchor" phx-mounted={JS.dispatch("exterm:mounted", to: "#exterm-terminal")}/>
     </div>
     <div id="exterm-paste-target" phx-click="paste"/>
 
@@ -79,7 +80,9 @@ defmodule ExTerm do
       (() => {
         const terminal = document.getElementById("exterm-terminal");
         const paste_target = document.getElementById("exterm-paste-target")
-        terminal.addEventListener("exterm:mounted", event => event.target.scroll(0, 5));
+        terminal.addEventListener("exterm:mounted", event => {
+          setTimeout((() => {console.log("hi"); event.target.scroll(0, 30)}), 100)
+        });
 
         const rowCol = (node) => {
           var id;

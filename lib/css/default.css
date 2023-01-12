@@ -16,19 +16,17 @@ div#exterm-terminal {
     font-family: courier-new, courier, monospace;
     font-size: 15px;
     width: 100ch;
-    height: 480px;
+    height: 579px;
     position: relative;
     overflow-y: scroll;
 }
 
-div#exterm-buffer {
-    overflow-anchor: none;
-    position: relative;
-}
-
 div#exterm-console {
     overflow-anchor: none;
-    position: relative;
+}
+
+span.exterm-cell {
+    overflow-anchor: none;
 }
 
 div#exterm-anchor {

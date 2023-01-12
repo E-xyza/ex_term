@@ -12,13 +12,14 @@ defmodule ExTerm.IexBackend do
   @behaviour Backend
   use GenServer
 
-  @enforce_keys [:console, :pubsub_topic]
+  @enforce_keys [:console, :pubsub_topic, :shell]
   defstruct @enforce_keys ++ [:prompt, flags: MapSet.new()]
 
   @type state :: %__MODULE__{
           console: Console.t(),
-          prompt: nil | GenServer.reply(),
           pubsub_topic: String.t(),
+          shell: pid,
+          prompt: nil | GenServer.reply(),
           flags: MapSet.t(String.t())
         }
 
@@ -35,7 +36,7 @@ defmodule ExTerm.IexBackend do
     # TODO: move this to a DynamicSupervisor.
     backend = self()
 
-    Task.start_link(fn ->
+    {:ok, shell} = Task.start_link(fn ->
       :erlang.group_leader(backend, self())
       IEx.Server.run([])
     end)
@@ -44,7 +45,7 @@ defmodule ExTerm.IexBackend do
 
     console = Console.new(handle_update: &broadcast_update(&1, @pubsub_server, pubsub_topic))
 
-    {:ok, %__MODULE__{console: console, pubsub_topic: pubsub_topic}}
+    {:ok, %__MODULE__{console: console, pubsub_topic: pubsub_topic, shell: shell}}
   end
 
   @impl Backend
@@ -149,6 +150,27 @@ defmodule ExTerm.IexBackend do
 
   defp special_keydown("ArrowRight", state) do
     {:reply, :ok, %{state | prompt: Prompt.right(state.prompt)}}
+  end
+
+  defp special_keydown("Tab", state = %{console: console, prompt: %{location: {row, column}}}) do
+    new_row = state.prompt.precursor
+    |> Enum.flat_map(&String.to_charlist/1)
+    |> IEx.Autocomplete.expand()
+    |> case do
+      {:no, _, _} -> row
+      {:yes, _, list_of_options} ->
+        options = Enum.join(list_of_options, "\t")
+        Helpers.transaction(console, :mutate) do
+          {init_row, _} = Console.get_metadata(console, :cursor)
+          {end_row, _} = console
+          |> Console.insert_string(options, row)
+          |> Console.get_metadata(:cursor)
+
+          # rows added
+          row + end_row - init_row
+        end
+      end
+    {:reply, :ok, %{state | prompt: %{state.prompt | location: {new_row, column}}}}
   end
 
   @flagkeys ~w(Alt AltGraph CapsLock Control Fn Hyper Meta Shift Super Symbol)
