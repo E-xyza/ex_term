@@ -24,4 +24,7 @@ config :logger, :console,
   format: "$time $metadata[$level] $message\n",
   metadata: [:request_id]
 
+# note that this won't be set to be true when it's used as a library
+config :ex_term, :check_transaction, true
+
 import_config "#{config_env()}.exs"

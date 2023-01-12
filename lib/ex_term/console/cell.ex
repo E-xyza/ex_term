@@ -3,33 +3,35 @@ defmodule ExTerm.Console.Cell do
 
   use Phoenix.Component
 
+  def render(assigns = %{cell: {location = {row, column}, cell}, cursor: cursor}) do
+    char = cell.char || " "
+
+    sentinel_class =
+      case cell.char do
+        "\n" -> "exterm-cell-sentinel"
+        c when c in [nil, " "] -> "exterm-cell-space"
+        _ -> nil
+      end
+
+    cursor_class =
+      case {location === cursor, assigns.prompt} do
+        {true, true} -> "exterm-cursor-active"
+        {true, _} -> "exterm-cursor"
+        _ -> nil
+      end
+
+    class = ["exterm-cell", sentinel_class, cursor_class]
+
+    assigns = %{id: "exterm-cell-#{row}-#{column}", class: class, style: cell.style, char: char}
+
+    ~H"<span id={@id} class={@class} style={@style}><%= @char %></span>"
+  end
+
   alias ExTerm.Style
-  alias ExTerm.Prompt
 
   defstruct style: Style.new(), char: nil
   @type t :: %__MODULE__{style: Style.t(), char: nil | String.t()}
   def new, do: %__MODULE__{}
 
-  def render(%{cell: {rc = {row, column}, cell}, cursor: cursor, prompt: prompt}) do
-    cursor_style =
-      List.wrap(
-        if prompt do
-          if cursor == rc do
-            if Prompt.active?(prompt) do
-              "exterm-cursor exterm-cursor-active"
-            else
-              "exterm-cursor"
-            end
-          end
-        end
-      )
-
-    assigns = %{
-      id: "exterm-cell-#{row}-#{column}",
-      classes: ["exterm-cell", " " | cursor_style],
-      cell: cell
-    }
-
-    ~H(<div id={@id} class={@classes} style={@cell.style}><%= @cell.char %></div>)
-  end
+  def sentinel, do: %__MODULE__{char: "\n"}
 end
