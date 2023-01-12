@@ -153,16 +153,16 @@ defmodule ExTerm.IexBackend do
     {:reply, :ok, %{state | prompt: Prompt.right(state.prompt)}}
   end
 
-  defp special_keydown("Tab", state = %{console: console, prompt: %{location: {row, column}}}) do
-    new_row =
-      state.prompt.precursor
+  defp special_keydown("Tab", state = %{console: console, prompt: prompt = %{location: {row, column}}}) do
+    {new_prompt, new_row} =
+      prompt.precursor
       |> Enum.flat_map(&String.to_charlist/1)
       |> IEx.Autocomplete.expand()
       |> case do
         {:no, _, _} ->
-          row
+          {prompt, row}
 
-        {:yes, _, list_of_options} ->
+        {:yes, [], list_of_options} ->
           options = Enum.join(list_of_options, "\t")
 
           Helpers.transaction console, :mutate do
@@ -174,11 +174,18 @@ defmodule ExTerm.IexBackend do
               |> Console.get_metadata(:cursor)
 
             # rows added
-            row + end_row - init_row
+            {prompt, row + end_row - init_row}
           end
+
+        {:yes, one_option, []} ->
+          new_prompt = Prompt.autocomplete_one(prompt, one_option)
+          {row, _} = Helpers.transaction console, :access do
+            Console.get_metadata(console, :cursor)
+          end
+          {new_prompt, row}
       end
 
-    {:reply, :ok, %{state | prompt: %{state.prompt | location: {new_row, column}}}}
+    {:reply, :ok, %{state | prompt: %{new_prompt | location: {new_row, column}}}}
   end
 
   @flagkeys ~w(Alt AltGraph CapsLock Control Fn Hyper Meta Shift Super Symbol)

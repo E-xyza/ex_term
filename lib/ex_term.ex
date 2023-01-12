@@ -70,7 +70,7 @@ defmodule ExTerm do
 
   def render(assigns) do
     ~H"""
-    <div id="exterm-terminal" class={class_for(@focus)} phx-keydown="keydown" phx-focus="focus" phx-blur="blur" tabindex="0">
+    <div id="exterm-terminal" contenteditable class={class_for(@focus)} phx-keydown="keydown" phx-focus="focus" phx-blur="blur" tabindex="0">
       <Console.render :if={@console} cells={@cells} cursor={@cursor} prompt={@prompt}/>
       <div :if={@console} id="exterm-anchor" phx-mounted={JS.dispatch("exterm:mounted", to: "#exterm-terminal")}/>
     </div>
@@ -82,8 +82,15 @@ defmodule ExTerm do
         const terminal = document.getElementById("exterm-terminal");
         const paste_target = document.getElementById("exterm-paste-target")
         terminal.addEventListener("exterm:mounted", event => {
-          setTimeout((() => {console.log("hi"); event.target.scroll(0, 30)}), 100)
-        });
+          setTimeout(() => event.target.scroll(0, 30), 100);
+        })
+
+        terminal.addEventListener("keydown", event =>
+          {
+            // prevents the default event from firing (this is mostly tab focusing,
+            // but also contenteditable changes)
+            event.preventDefault();
+          })
 
         const rowCol = (node) => {
           var id;

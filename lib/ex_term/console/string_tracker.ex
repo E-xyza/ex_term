@@ -94,7 +94,6 @@ defmodule ExTerm.Console.StringTracker do
         move_distance = last_row - row + 1
 
         done
-        |> IO.inspect()
         |> pad_last_row(columns)
         |> move_succeeding_rows(row, move_distance)
         |> update_cursor(tracker.old_cursor, row, move_distance)
