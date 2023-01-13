@@ -1,13 +1,13 @@
-div.exterm.exterm-focused {
+div.exterm-focused {
     border-style: solid;
     border-color: yellow;
-    border-width: 2px;
+    border-width: 4px;
 }
 
-div.exterm.exterm-blurred {
+div.exterm-blurred {
     border-style: solid;
     border-color: black;
-    border-width: 2px;
+    border-width: 4px;
 }
 
 div#exterm-terminal {
