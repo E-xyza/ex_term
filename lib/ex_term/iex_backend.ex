@@ -212,6 +212,13 @@ defmodule ExTerm.IexBackend do
     raise "#{other} not supported yet"
   end
 
+  @impl Backend
+  def handle_paste(pid, paste), do: GenServer.call(pid, {:handle_paste, paste})
+
+  defp handle_paste_impl(paste, _from, state) do
+    {:reply, :ok, %{state | prompt: Prompt.paste(state.prompt, paste)}}
+  end
+
   @impl GenServer
   def handle_info({:io_request, pid, ref, request}, state) do
     handle_io_request({pid, ref}, request, state)
@@ -221,6 +228,7 @@ defmodule ExTerm.IexBackend do
   @impl GenServer
   def handle_call(:get_console, from, state), do: get_console_impl(from, state)
   def handle_call({:handle_keydown, key}, from, state), do: handle_keydown_impl(key, from, state)
+  def handle_call({:handle_paste, paste}, from, state), do: handle_paste_impl(paste, from, state)
 
   ### UTILITIES
   defp pubsub_topic(pid) do
