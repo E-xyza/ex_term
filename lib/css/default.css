@@ -1,13 +1,13 @@
-div.exterm.exterm-focused {
+div.exterm-focused {
     border-style: solid;
     border-color: yellow;
-    border-width: 2px;
+    border-width: 4px;
 }
 
-div.exterm.exterm-blurred {
+div.exterm-blurred {
     border-style: solid;
     border-color: black;
-    border-width: 2px;
+    border-width: 4px;
 }
 
 div#exterm-terminal {
@@ -16,7 +16,7 @@ div#exterm-terminal {
     font-family: courier-new, courier, monospace;
     font-size: 15px;
     width: 100ch;
-    height: 579px;
+    height: 583px;
     position: relative;
     overflow-y: scroll;
     caret-color: transparent;

@@ -21,7 +21,7 @@ defmodule ExTerm.IexBackend do
           pubsub_topic: String.t(),
           shell: pid,
           prompt: nil | GenServer.reply(),
-          history: History.t,
+          history: History.t(),
           flags: MapSet.t(String.t())
         }
 
@@ -71,14 +71,15 @@ defmodule ExTerm.IexBackend do
 
   def get_console(server), do: GenServer.call(server, :get_console)
 
-  defp get_console_impl(from, state), do: {:reply, state.console, state}
+  defp get_console_impl(_from, state), do: {:reply, state.console, state}
 
-  defp get_geometry_impl(from, dimension, state) do
-    reply =
+  defp get_geometry_impl(from, dimension, state = %{console: console}) do
+    reply = Helpers.transaction(console, :access) do
       case Console.layout(state.console) do
         {rows, _} when dimension === :rows -> rows
         {_, columns} when dimension === :columns -> columns
       end
+    end
 
     ExTerm.io_reply(from, {:ok, reply})
   end
@@ -107,7 +108,7 @@ defmodule ExTerm.IexBackend do
     cursor =
       Helpers.transaction console, :mutate do
         Console.put_string(console, prompt)
-        Console.get_metadata(console, :cursor)
+        Console.cursor(console)
       end
 
     broadcast_update({:prompt, :active}, @pubsub_server, state.pubsub_topic)
@@ -140,9 +141,10 @@ defmodule ExTerm.IexBackend do
   end
 
   defp special_keydown("Enter", state) do
-    new_state = state
-    |> History.commit()
-    |> Map.update!(:prompt, &Prompt.submit/1)
+    new_state =
+      state
+      |> History.commit()
+      |> Map.update!(:prompt, &Prompt.submit/1)
 
     {:reply, :ok, new_state}
   end
@@ -167,7 +169,10 @@ defmodule ExTerm.IexBackend do
     {:reply, :ok, History.down(state)}
   end
 
-  defp special_keydown("Tab", state = %{console: console, prompt: prompt = %{location: {row, column}}}) do
+  defp special_keydown(
+         "Tab",
+         state = %{console: console, prompt: prompt = %{location: {row, column}}}
+       ) do
     {new_prompt, new_row} =
       prompt.precursor
       |> Enum.flat_map(&String.to_charlist/1)
@@ -180,7 +185,7 @@ defmodule ExTerm.IexBackend do
           options = Enum.join(list_of_options, "\t")
 
           Helpers.transaction console, :mutate do
-            {init_row, _} = Console.get_metadata(console, :cursor)
+            {init_row, _} = Console.cursor(console)
 
             {end_row, _} =
               console
@@ -193,9 +198,12 @@ defmodule ExTerm.IexBackend do
 
         {:yes, one_option, []} ->
           new_prompt = Prompt.substitute(prompt, one_option)
-          {row, _} = Helpers.transaction console, :access do
-            Console.get_metadata(console, :cursor)
-          end
+
+          {row, _} =
+            Helpers.transaction console, :access do
+              Console.cursor(console)
+            end
+
           {new_prompt, row}
       end
 

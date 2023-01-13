@@ -25,7 +25,7 @@ defmodule ExTerm.Console.Cell do
 
     assigns = %{id: "exterm-cell-#{row}-#{column}", class: class, style: cell.style, char: char}
 
-    ~H"<span id={@id} class={@class} style={@style}><%= @char %></span>"
+    ~H"<span id={@id} class={@class} style={@style} contenteditable='false'><%= @char %></span>"
   end
 
   alias ExTerm.Style

@@ -1,5 +1,5 @@
 defmodule ExTerm.IexBackend.History do
-  @type t :: {past :: [String.t], future :: [String.t]}
+  @type t :: {past :: [String.t()], future :: [String.t()]}
 
   alias ExTerm.IexBackend.Prompt
 
@@ -18,13 +18,15 @@ defmodule ExTerm.IexBackend.History do
   end
 
   def commit(state = %{history: {past, future}, prompt: prompt}) do
-    content = prompt.precursor
-    |> Enum.reverse(prompt.postcursor)
-    |> IO.iodata_to_binary
+    content =
+      prompt.precursor
+      |> Enum.reverse(prompt.postcursor)
+      |> IO.iodata_to_binary()
 
-    new_past = future
-    |> Enum.reverse(past)
-    |> List.insert_at(0, content)
+    new_past =
+      future
+      |> Enum.reverse(past)
+      |> List.insert_at(0, content)
 
     %{state | history: {new_past, []}}
   end

@@ -1,13 +1,16 @@
 defmodule ExTerm.JS do
   use Phoenix.LiveComponent
 
-  @script __DIR__ |> Path.join("../_js/ex_term.js") |> File.read!()
+  @exterm_js Path.join(__DIR__, "../_js/ex_term.js")
+  @external_resource @exterm_js
+  @script File.read!(@exterm_js)
 
   def render(_) do
     assigns = %{script: @script}
+
     ~H"""
     <script>
-    <%= @script %>
+    <%= Phoenix.HTML.raw(@script) %>
     </script>
     """
   end

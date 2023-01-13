@@ -67,9 +67,10 @@ defmodule ExTerm.IexBackend.Prompt do
   end
 
   def paste(prompt = %{console: console}, content) do
-    precursor = content
-    |> breakdown
-    |> Kernel.++(prompt.precursor)
+    precursor =
+      content
+      |> breakdown
+      |> Kernel.++(prompt.precursor)
 
     paint(%{prompt | precursor: precursor})
   end
@@ -106,7 +107,7 @@ defmodule ExTerm.IexBackend.Prompt do
       |> Console.move_cursor(prompt.location)
       |> Console.put_string(precursor)
 
-      cursor = Console.get_metadata(console, :cursor)
+      cursor = Console.cursor(console)
 
       postcursor = IO.iodata_to_binary(prompt.postcursor ++ List.wrap(extras))
 

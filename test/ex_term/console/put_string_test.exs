@@ -131,7 +131,7 @@ defmodule ExTermTest.Console.PutStringTest do
         assert %{char: "\n"} = Console.get(console, {6, 6})
         assert %{char: "\n"} = Console.get(console, {7, 6})
 
-        assert {7, 2} = Console.get_metadata(console, :cursor)
+        assert {7, 2} = Console.cursor(console)
       end
     end
   end
