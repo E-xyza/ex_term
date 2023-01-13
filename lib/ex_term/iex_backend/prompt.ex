@@ -66,6 +66,14 @@ defmodule ExTerm.IexBackend.Prompt do
     nil
   end
 
+  def paste(prompt = %{console: console}, content) do
+    precursor = content
+    |> breakdown
+    |> Kernel.++(prompt.precursor)
+
+    paint(%{prompt | precursor: precursor})
+  end
+
   def substitute(prompt, substitution) do
     precursor = breakdown(substitution)
     paint(%{prompt | precursor: precursor})

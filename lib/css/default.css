@@ -19,6 +19,7 @@ div#exterm-terminal {
     height: 579px;
     position: relative;
     overflow-y: scroll;
+    caret-color: transparent;
 }
 
 div#exterm-console {
