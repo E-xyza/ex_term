@@ -11,11 +11,12 @@ defmodule ExTermTest.ConsoleTest do
     test "it produces an 24x80 layout by default" do
       console = Console.new()
 
-      assert {24, 80} == Console.layout(console)
-      assert {1, 1} == Console.cursor(console)
-      assert %Style{} == Console.style(console)
-
       Helpers.transaction console, :access do
+
+        assert {24, 80} == Console.layout(console)
+        assert {1, 1} == Console.cursor(console)
+        assert %Style{} == Console.style(console)
+
         for row <- 1..24, column <- 1..80 do
           assert %{char: nil} = Console.get(console, {row, column})
         end

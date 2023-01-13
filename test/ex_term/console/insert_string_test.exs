@@ -22,7 +22,7 @@ defmodule ExTermTest.Console.InsertStringTest do
       Helpers.transaction console, :mutate do
         Console.put_cell(console, {5, 5}, %Cell{char: "a"})
 
-        assert {1, 1} = Console.get_metadata(console, :cursor)
+        assert {1, 1} = Console.cursor(console)
 
         # inserts a string on line 5
         Console.insert_string(console, "foo", 5)
@@ -41,7 +41,7 @@ defmodule ExTermTest.Console.InsertStringTest do
         assert %{char: nil} = Console.get(console, {5, 5})
         assert %{char: "a"} = Console.get(console, {6, 5})
 
-        assert {1, 1} = Console.get_metadata(console, :cursor)
+        assert {1, 1} = Console.cursor(console)
       end
     end
 
@@ -71,7 +71,7 @@ defmodule ExTermTest.Console.InsertStringTest do
         assert %{char: nil} = Console.get(console, {5, 5})
         assert %{char: "a"} = Console.get(console, {6, 5})
 
-        assert {6, 2} = Console.get_metadata(console, :cursor)
+        assert {6, 2} = Console.cursor(console)
       end
     end
 
@@ -80,7 +80,7 @@ defmodule ExTermTest.Console.InsertStringTest do
       Helpers.transaction console, :mutate do
         Console.put_cell(console, {5, 5}, %Cell{char: "a"})
 
-        Console.get_metadata(console, :cursor)
+        Console.cursor(console)
 
         # inserts a string on line 5
         Console.insert_string(console, "foobar", 5)

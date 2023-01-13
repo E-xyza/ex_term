@@ -106,23 +106,17 @@ defmodule ExTerm.Console do
 
   @spec layout(t) :: location
   def layout(console) do
-    transaction(console, :access) do
-      get_metadata(console, :layout)
-    end
+    get_metadata(console, :layout)
   end
 
   @spec cursor(t) :: location
   def cursor(console) do
-    transaction(console, :access) do
-      get_metadata(console, :cursor)
-    end
+    get_metadata(console, :cursor)
   end
 
   @spec style(t) :: Style.t()
   def style(console) do
-    transaction(console, :access) do
-      get_metadata(console, :style)
-    end
+    get_metadata(console, :style)
   end
 
   # basic access functions
@@ -200,7 +194,7 @@ defmodule ExTerm.Console do
   def new_row(console, :end) do
     {row, _} = last_cell(console)
     new_row = row + 1
-    {_rows, columns} = get_metadata(console, :layout)
+    {_rows, columns} = layout(console)
 
     # note it's okay to put that last one out of order because ets will
     # order it correctly.
@@ -285,7 +279,7 @@ defmodule ExTerm.Console do
 
   @spec move_cursor(t(), any) :: t()
   def move_cursor(console, new_cursor) do
-    old_cursor = get_metadata(console, :cursor)
+    old_cursor = cursor(console)
     last_cell = last_cell(console)
 
     console
@@ -305,7 +299,7 @@ defmodule ExTerm.Console do
         ) :: t
   @spec update_with(t, from :: location, to :: location, last_cell :: location) :: t
   defp update_with(console, from, to, last_cell) do
-    cursor = get_metadata(console, :cursor)
+    cursor = cursor(console)
     update_with(console, from, to, cursor, last_cell)
   end
 

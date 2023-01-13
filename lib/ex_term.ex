@@ -94,7 +94,7 @@ defmodule ExTerm do
           # obtain the layout and dump the whole layout.
           {rows, columns} =
             Helpers.transaction console, :access do
-              Console.get_metadata(console, :layout)
+              Console.layout(console)
             end
 
           # fill the cells with dummy cells that won't be in the initial layout.

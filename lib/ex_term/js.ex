@@ -7,6 +7,7 @@ defmodule ExTerm.JS do
 
   def render(_) do
     assigns = %{script: @script}
+
     ~H"""
     <script>
     <%= Phoenix.HTML.raw(@script) %>
