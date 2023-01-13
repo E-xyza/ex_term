@@ -4,6 +4,7 @@ defmodule ExTerm.IexBackend do
   alias ExTerm.Backend
   alias ExTerm.Console
   alias ExTerm.Console.Helpers
+  alias ExTerm.IexBackend.History
   alias ExTerm.IexBackend.Prompt
   alias Phoenix.PubSub
 
@@ -13,13 +14,14 @@ defmodule ExTerm.IexBackend do
   use GenServer
 
   @enforce_keys [:console, :pubsub_topic, :shell]
-  defstruct @enforce_keys ++ [:prompt, flags: MapSet.new()]
+  defstruct @enforce_keys ++ [:prompt, history: History.new(), flags: MapSet.new()]
 
   @type state :: %__MODULE__{
           console: Console.t(),
           pubsub_topic: String.t(),
           shell: pid,
           prompt: nil | GenServer.reply(),
+          history: History.t,
           flags: MapSet.t(String.t())
         }
 
@@ -138,7 +140,11 @@ defmodule ExTerm.IexBackend do
   end
 
   defp special_keydown("Enter", state) do
-    {:reply, :ok, %{state | prompt: Prompt.submit(state.prompt)}}
+    new_state = state
+    |> History.commit()
+    |> Map.update!(:prompt, &Prompt.submit/1)
+
+    {:reply, :ok, new_state}
   end
 
   defp special_keydown("Backspace", state) do
@@ -151,6 +157,14 @@ defmodule ExTerm.IexBackend do
 
   defp special_keydown("ArrowRight", state) do
     {:reply, :ok, %{state | prompt: Prompt.right(state.prompt)}}
+  end
+
+  defp special_keydown("ArrowUp", state) do
+    {:reply, :ok, History.up(state)}
+  end
+
+  defp special_keydown("ArrowDown", state) do
+    {:reply, :ok, History.down(state)}
   end
 
   defp special_keydown("Tab", state = %{console: console, prompt: prompt = %{location: {row, column}}}) do
@@ -178,7 +192,7 @@ defmodule ExTerm.IexBackend do
           end
 
         {:yes, one_option, []} ->
-          new_prompt = Prompt.autocomplete_one(prompt, one_option)
+          new_prompt = Prompt.substitute(prompt, one_option)
           {row, _} = Helpers.transaction console, :access do
             Console.get_metadata(console, :cursor)
           end

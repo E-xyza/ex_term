@@ -66,13 +66,25 @@ defmodule ExTerm.IexBackend.Prompt do
     nil
   end
 
-  def autocomplete_one(prompt = %{console: console}, autocompletion) do
-    precursor =
-      autocompletion
-      |> Enum.map(&List.to_string([&1]))
-      |> Enum.reverse(prompt.precursor)
-
+  def substitute(prompt, substitution) do
+    precursor = breakdown(substitution)
     paint(%{prompt | precursor: precursor})
+  end
+
+  defp breakdown(charlist_or_string, so_far \\ [])
+
+  defp breakdown(string, so_far) when is_list(string) do
+    case string do
+      [] -> so_far
+      [this | rest] -> [List.to_string([this]) | so_far]
+    end
+  end
+
+  defp breakdown(string, so_far) when is_binary(string) do
+    case String.next_grapheme(string) do
+      nil -> so_far
+      {grapheme, rest} -> breakdown(rest, [grapheme | so_far])
+    end
   end
 
   defp paint(prompt = %{console: console}, extras \\ nil) do
