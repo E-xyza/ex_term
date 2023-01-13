@@ -70,7 +70,7 @@ defmodule ExTerm do
 
   def render(assigns) do
     ~H"""
-    <div id="exterm-terminal" contenteditable class={class_for(@focus)} phx-keydown="keydown" phx-focus="focus" phx-blur="blur" tabindex="0">
+    <div id="exterm-terminal" contenteditable spellcheck="false" class={class_for(@focus)} phx-keydown="keydown" phx-focus="focus" phx-blur="blur" tabindex="0">
       <Console.render :if={@console} cells={@cells} cursor={@cursor} prompt={@prompt}/>
       <div :if={@console} id="exterm-anchor" phx-mounted={JS.dispatch("exterm:mounted", to: "#exterm-terminal")}/>
     </div>
