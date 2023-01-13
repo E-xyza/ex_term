@@ -6,9 +6,9 @@ defmodule ExTerm.IexBackend.Prompt do
 
   require Helpers
 
-  @enforce_keys [:location, :reply, :console]
+  @enforce_keys [:location, :reply, :console, :precursor]
 
-  defstruct @enforce_keys ++ [precursor: [], postcursor: []]
+  defstruct @enforce_keys ++ [postcursor: []]
 
   @type t :: %__MODULE__{
           location: ExTerm.location(),
@@ -18,8 +18,8 @@ defmodule ExTerm.IexBackend.Prompt do
           postcursor: [String.t()]
         }
 
-  def new(reply, location, console) do
-    %__MODULE__{reply: reply, location: location, console: console}
+  def new(reply, location, precursor, console) do
+    paint(%__MODULE__{reply: reply, location: location, precursor: precursor, console: console})
   end
 
   def push(prompt, key) do

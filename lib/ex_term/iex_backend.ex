@@ -5,6 +5,7 @@ defmodule ExTerm.IexBackend do
   alias ExTerm.Console
   alias ExTerm.Console.Helpers
   alias ExTerm.IexBackend.History
+  alias ExTerm.IexBackend.KeyBuffer
   alias ExTerm.IexBackend.Prompt
   alias Phoenix.PubSub
 
@@ -14,13 +15,14 @@ defmodule ExTerm.IexBackend do
   use GenServer
 
   @enforce_keys [:console, :pubsub_topic, :shell]
-  defstruct @enforce_keys ++ [:prompt, history: History.new(), flags: MapSet.new()]
+  defstruct @enforce_keys ++ [:prompt, buffer: KeyBuffer.new(), history: History.new(), flags: MapSet.new()]
 
   @type state :: %__MODULE__{
           console: Console.t(),
           pubsub_topic: String.t(),
           shell: pid,
           prompt: nil | GenServer.reply(),
+          buffer: KeyBuffer.t(),
           history: History.t(),
           flags: MapSet.t(String.t())
         }
@@ -114,8 +116,18 @@ defmodule ExTerm.IexBackend do
         Console.cursor(console)
       end
 
-    broadcast_update({:prompt, :active}, @pubsub_server, state.pubsub_topic)
-    {:noreply, %{state | prompt: Prompt.new(from, cursor, console)}}
+    case KeyBuffer.pop(state.buffer) do
+      {:full, item, new_buffer} ->
+        from
+        |> Prompt.new(cursor, item, console)
+        |> Prompt.submit
+
+        {:noreply, %{state | prompt: nil, buffer: new_buffer}}
+
+      {:partial, partial, new_buffer} ->
+        broadcast_update({:prompt, :active}, @pubsub_server, state.pubsub_topic)
+        {:noreply, %{state | prompt: Prompt.new(from, cursor, partial, console), buffer: new_buffer}}
+    end
   end
 
   def handle_io_request(from, {:get_geometry, type}, state) do
@@ -133,10 +145,13 @@ defmodule ExTerm.IexBackend do
   @impl Backend
   def handle_keydown(pid, key), do: GenServer.call(pid, {:handle_keydown, key})
 
-  defp handle_keydown_impl(key, _from, state) do
+  defp handle_keydown_impl(key, _from, state = %{prompt: prompt}) do
     case String.next_grapheme(key) do
+      {^key, ""} when is_nil(prompt) ->
+        {:reply, :ok, %{state | buffer: KeyBuffer.push(state.buffer, key)}}
+
       {^key, ""} ->
-        {:reply, :ok, %{state | prompt: Prompt.push(state.prompt, key)}}
+        {:reply, :ok, %{state | prompt: Prompt.push(prompt, key)}}
 
       _ ->
         special_keydown(key, state)
@@ -144,10 +159,13 @@ defmodule ExTerm.IexBackend do
   end
 
   defp special_keydown("Enter", state) do
-    new_state =
-      state
-      |> History.commit()
-      |> Map.update!(:prompt, &Prompt.submit/1)
+    new_state = if state.prompt do
+        state
+        |> History.commit()
+        |> Map.update!(:prompt, &Prompt.submit/1)
+    else
+      %{state | buffer: KeyBuffer.push(state.buffer, "Enter") }
+    end
 
     {:reply, :ok, new_state}
   end
