@@ -71,14 +71,15 @@ defmodule ExTerm.IexBackend do
 
   def get_console(server), do: GenServer.call(server, :get_console)
 
-  defp get_console_impl(from, state), do: {:reply, state.console, state}
+  defp get_console_impl(_from, state), do: {:reply, state.console, state}
 
-  defp get_geometry_impl(from, dimension, state) do
-    reply =
+  defp get_geometry_impl(from, dimension, state = %{console: console}) do
+    reply = Helpers.transaction(console, :access) do
       case Console.layout(state.console) do
         {rows, _} when dimension === :rows -> rows
         {_, columns} when dimension === :columns -> columns
       end
+    end
 
     ExTerm.io_reply(from, {:ok, reply})
   end
