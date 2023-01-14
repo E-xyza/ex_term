@@ -75,6 +75,14 @@ defmodule ExTerm.IexBackend.Prompt do
     paint(%{prompt | precursor: precursor})
   end
 
+  def append(prompt, charlist) do
+    precursor = charlist
+    |> breakdown
+    |> Kernel.++(prompt.precursor)
+
+    paint(%{prompt | precursor: precursor})
+  end
+
   def substitute(prompt, substitution) do
     precursor = breakdown(substitution)
     paint(%{prompt | precursor: precursor})
@@ -85,7 +93,7 @@ defmodule ExTerm.IexBackend.Prompt do
   defp breakdown(string, so_far) when is_list(string) do
     case string do
       [] -> so_far
-      [this | rest] -> [List.to_string([this]) | so_far]
+      [this | rest] -> breakdown(rest, [List.to_string([this]) | so_far])
     end
   end
 

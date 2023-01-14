@@ -218,7 +218,7 @@ defmodule ExTerm.IexBackend do
           end
 
         {:yes, one_option, []} ->
-          new_prompt = Prompt.substitute(prompt, one_option)
+          new_prompt = Prompt.append(prompt, one_option)
 
           {row, _} =
             Helpers.transaction console, :access do
