@@ -12,7 +12,6 @@ defmodule ExTermTest.ConsoleTest do
       console = Console.new()
 
       Helpers.transaction console, :access do
-
         assert {24, 80} == Console.layout(console)
         assert {1, 1} == Console.cursor(console)
         assert %Style{} == Console.style(console)

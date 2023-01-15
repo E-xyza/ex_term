@@ -157,16 +157,20 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   @spec send_update(t, keyword) :: t
-  def send_update(tracker = %{cursor: cursor, console: console, last_updated: last_updated}, opts \\ []) do
+  def send_update(
+        tracker = %{cursor: cursor, console: console, last_updated: last_updated},
+        opts \\ []
+      ) do
     console
     |> Console.put_metadata(:cursor, cursor)
     |> Console.insert(tracker.updates)
 
-    last_updated = case Keyword.get(opts, :with_cursor) do
-      true when cursor < last_updated -> last_updated
-      true -> cursor
-      _ -> last_updated
-    end
+    last_updated =
+      case Keyword.get(opts, :with_cursor) do
+        true when cursor < last_updated -> last_updated
+        true -> cursor
+        _ -> last_updated
+      end
 
     case Console.get_metadata(tracker.console, :handle_update) do
       fun when is_function(fun, 1) ->

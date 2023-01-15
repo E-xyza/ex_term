@@ -31,6 +31,7 @@ defmodule ExTerm.Console do
             {:private | :protected, pid, :ets.table()}
             | {:public, pid, :ets.table(), :atomics.atomics_ref()}
   @type location :: {pos_integer(), pos_integer()}
+  @type layout :: location | {0, 0}
   @type update ::
           {:xterm_console_update, from :: location, to :: location, cursor :: location,
            last_cell :: location}
@@ -180,7 +181,9 @@ defmodule ExTerm.Console do
 
     console
     |> insert({location, char})
-    |> update_with(location, location, last_cell)
+
+    raise "foo"
+    # |> update_with(location, location, last_cell)
   end
 
   # compound operations
@@ -200,7 +203,9 @@ defmodule ExTerm.Console do
     # order it correctly.
     console
     |> insert(make_blank_row(new_row, columns))
-    |> update_with({new_row, 1}, {new_row, columns + 1}, {new_row, columns})
+
+    raise "foo"
+    # |> update_with({new_row, 1}, {new_row, columns + 1}, {new_row, columns})
   end
 
   def new_row(console, line) when is_integer(line) do
@@ -216,7 +221,9 @@ defmodule ExTerm.Console do
 
     console
     |> insert(update)
-    |> update_with({line, 1}, {last_row + 1, last_column}, {last_row + 1, last_column - 1})
+
+    raise "foo"
+    # |> update_with({line, 1}, {last_row + 1, last_column}, {last_row + 1, last_column - 1})
   end
 
   @spec put_string(t, String.t()) :: t
@@ -284,29 +291,20 @@ defmodule ExTerm.Console do
 
     console
     |> put_metadata(:cursor, new_cursor)
-    |> update_with(old_cursor, old_cursor, new_cursor, last_cell)
-    |> update_with(new_cursor, new_cursor, new_cursor, last_cell)
+
+    raise "foo"
+
+    # |> update_with(old_cursor, old_cursor, new_cursor, last_cell)
+    # |> update_with(new_cursor, new_cursor, new_cursor, last_cell)
   end
 
   # functional utilities
-
-  @spec update_with(
-          t,
-          from :: location,
-          to :: location,
-          cursor :: location,
-          last_cell :: location
-        ) :: t
-  @spec update_with(t, from :: location, to :: location, last_cell :: location) :: t
-  defp update_with(console, from, to, last_cell) do
-    cursor = cursor(console)
-    update_with(console, from, to, cursor, last_cell)
-  end
-
-  defp update_with(console, from, to, cursor, last_cell) do
+  @moduledoc false
+  # this is for internal use only.
+  def update_with(console, update) do
     case get_metadata(console, :handle_update) do
       fun when is_function(fun, 1) ->
-        fun.(update_msg(from: from, to: to, cursor: cursor, last_cell: last_cell))
+        fun.(update)
 
       nil ->
         :ok
@@ -338,10 +336,8 @@ defmodule ExTerm.Console do
 
   If the row doesn't exist, returns 0.
   """
-  defaccess columns(console, row) do
-    console
-    |> table()
-    |> :ets.select_count(column_count_ms(row))
+  def columns(console, row) do
+    select_count(console, column_count_ms(row))
   end
 
   @spec full_row(t, row :: pos_integer, with_sentinel? :: boolean) :: [cellinfo]
@@ -354,7 +350,17 @@ defmodule ExTerm.Console do
     select(console, full_row_ms(row, with_sentinel?))
   end
 
-  @spec last_cell(t) :: location
+  @spec last_column?(t, location) :: boolean
+  @doc """
+  returns true if the cell exists and the location is on the last column of its
+  row, not inclusive of the sentinel.  Note this returns false if it's the
+  sentinel.
+  """
+  def last_column?(console, {row, column}) do
+    match?({_, %{char: "\n"}}, lookup(console, {row, column + 1}))
+  end
+
+  @spec last_cell(t) :: layout
   @doc """
   returns the last location on the console.
 
@@ -363,14 +369,11 @@ defmodule ExTerm.Console do
 
   If the table is empty and only contains metadata, returns `{0, 0}`
   """
-  defaccess last_cell(console) do
-    # the last item in the table encodes the last row because the ordered
+  def last_cell(console) do
+    # the last key in the table encodes the last row because the ordered
     # set is ordered based on erlang term order and erlang term order puts tuples
     # behind atoms, which are the only two types in the table.
-    console
-    |> table()
-    |> :ets.last()
-    |> case do
+    case last(console) do
       {row, column} -> {row, column - 1}
       metadata when is_atom(metadata) -> {0, 0}
     end
@@ -378,11 +381,36 @@ defmodule ExTerm.Console do
 
   # generic access functions
 
-  @spec select(t, :ets.match_spec()) :: [tuple]
+  @spec last(t) :: location | atom
+  defaccess last(console) do
+    console
+    |> table()
+    |> :ets.last()
+  end
+
+  @spec lookup(t, location) :: cellinfo | nil
+  defaccess lookup(console, location) do
+    console
+    |> table()
+    |> :ets.lookup(location)
+    |> case do
+      [cell] -> cell
+      [] -> nil
+    end
+  end
+
+  @spec select(t, :ets.match_spec()) :: [cellinfo]
   defaccess select(console, ms) do
     console
     |> table()
     |> :ets.select(ms)
+  end
+
+  @spec select_count(t, :ets.match_spec()) :: non_neg_integer
+  defaccess select_count(console, ms) do
+    console
+    |> table
+    |> :ets.select_count(ms)
   end
 
   @spec insert(t, tuple | [tuple]) :: t

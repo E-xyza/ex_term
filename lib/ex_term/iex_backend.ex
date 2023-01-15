@@ -15,7 +15,8 @@ defmodule ExTerm.IexBackend do
   use GenServer
 
   @enforce_keys [:console, :pubsub_topic, :shell]
-  defstruct @enforce_keys ++ [:prompt, buffer: KeyBuffer.new(), history: History.new(), flags: MapSet.new()]
+  defstruct @enforce_keys ++
+              [:prompt, buffer: KeyBuffer.new(), history: History.new(), flags: MapSet.new()]
 
   @type state :: %__MODULE__{
           console: Console.t(),
@@ -76,12 +77,13 @@ defmodule ExTerm.IexBackend do
   defp get_console_impl(_from, state), do: {:reply, state.console, state}
 
   defp get_geometry_impl(from, dimension, state = %{console: console}) do
-    reply = Helpers.transaction(console, :access) do
-      case Console.layout(state.console) do
-        {rows, _} when dimension === :rows -> rows
-        {_, columns} when dimension === :columns -> columns
+    reply =
+      Helpers.transaction console, :access do
+        case Console.layout(state.console) do
+          {rows, _} when dimension === :rows -> rows
+          {_, columns} when dimension === :columns -> columns
+        end
       end
-    end
 
     ExTerm.io_reply(from, {:ok, reply})
   end
@@ -120,13 +122,15 @@ defmodule ExTerm.IexBackend do
       {:full, item, new_buffer} ->
         from
         |> Prompt.new(cursor, item, console)
-        |> Prompt.submit
+        |> Prompt.submit()
 
         {:noreply, %{state | prompt: nil, buffer: new_buffer}}
 
       {:partial, partial, new_buffer} ->
         broadcast_update({:prompt, :active}, @pubsub_server, state.pubsub_topic)
-        {:noreply, %{state | prompt: Prompt.new(from, cursor, partial, console), buffer: new_buffer}}
+
+        {:noreply,
+         %{state | prompt: Prompt.new(from, cursor, partial, console), buffer: new_buffer}}
     end
   end
 
@@ -159,13 +163,14 @@ defmodule ExTerm.IexBackend do
   end
 
   defp special_keydown("Enter", state) do
-    new_state = if state.prompt do
+    new_state =
+      if state.prompt do
         state
         |> History.commit()
         |> Map.update!(:prompt, &Prompt.submit/1)
-    else
-      %{state | buffer: KeyBuffer.push(state.buffer, "Enter") }
-    end
+      else
+        %{state | buffer: KeyBuffer.push(state.buffer, "Enter")}
+      end
 
     {:reply, :ok, new_state}
   end

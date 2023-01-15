@@ -76,9 +76,10 @@ defmodule ExTerm.IexBackend.Prompt do
   end
 
   def append(prompt, charlist) do
-    precursor = charlist
-    |> breakdown
-    |> Kernel.++(prompt.precursor)
+    precursor =
+      charlist
+      |> breakdown
+      |> Kernel.++(prompt.precursor)
 
     paint(%{prompt | precursor: precursor})
   end
