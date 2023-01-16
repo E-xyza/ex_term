@@ -157,13 +157,12 @@ defmodule ExTerm.Console.Update do
   defguardp finish(range) when elem(range, 1)
 
   defguardp is_in_end_range(subject, range)
-            when is_end_range(range) and (
-              (is_location(subject) and subject >= start(range)) or
-              (is_any_range(subject) and start(subject) >= start(range)))
-
+            when is_end_range(range) and
+                   ((is_location(subject) and subject >= start(range)) or
+                      (is_any_range(subject) and start(subject) >= start(range)))
 
   defguardp is_in_range(subject, range)
-            when is_range(range) and
+            when is_range(range) and not is_end_range(subject) and
                    ((is_location(subject) and subject >= start(range) and
                        subject <= finish(range)) or
                       (start(subject) >= start(range) and finish(subject) <= finish(range)))
@@ -211,7 +210,7 @@ defmodule ExTerm.Console.Update do
 
   @doc false
   defguard _location_precedes_range(first, second)
-           when is_location(first) and is_range(second) and
+           when is_location(first) and is_any_range(second) and
                   is_adjoining_after(start(second), first)
 
   @doc false
@@ -219,12 +218,21 @@ defmodule ExTerm.Console.Update do
            when is_range(first) and is_location(second) and
                   is_adjoining_after(second, finish(first))
 
+  # specialized checks for range_precedes_range that handles end range cases.
+  defguardp double_end_range(first, second)
+            when is_end_range(first) and is_end_range(second) and start(first) < start(second)
+
+  defguardp end_range_check(first, second)
+            when is_end_range(second) or
+                   (not is_end_range(first) and
+                      (is_range(second) and finish(first) <= finish(second)))
+
   @doc false
   defguard _range_precedes_range(first, second)
-           when is_range(first) and is_range(second) and
-                  finish(first) <= finish(second) and
-                  (finish(first) >= start(second) or
-                     _location_precedes_location(finish(first), start(second)))
+           when double_end_range(first, second) or
+                  (end_range_check(first, second) and
+                     (finish(first) >= start(second) or
+                        _location_precedes_location(finish(first), start(second))))
 
   @doc false
   @spec _push_change(cell_changes, cell_change, cell_changes) :: cell_changes
