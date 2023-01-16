@@ -12,6 +12,7 @@ defmodule ExTermTest.Console.UpdateTest do
       _location_precedes_location: 2,
       _location_precedes_range: 2,
       _range_precedes_location: 2,
+      _range_precedes_range: 2,
       _push_change: 2
     ]
 
@@ -107,6 +108,20 @@ defmodule ExTermTest.Console.UpdateTest do
       refute _range_precedes_location({{1, 3}, {2, :end}}, {4, 1})
       refute _range_precedes_location({{1, 2}, {1, 3}}, {1, 1})
     end
+
+    test "_range_precedes_range/2 identifies next-door ranges" do
+      refute _range_precedes_range({{1, 2}, {2, 1}}, {{2, 3}, {2, 4}})
+      assert _range_precedes_range({{1, 2}, {2, 2}}, {{2, 3}, {2, 4}})
+    end
+
+    test "_range_precedes_range/2 identifies overlapping ranges" do
+      assert _range_precedes_range({{1, 2}, {2, 3}}, {{2, 3}, {2, 5}})
+      assert _range_precedes_range({{1, 2}, {2, 4}}, {{2, 3}, {2, 5}})
+      assert _range_precedes_range({{1, 2}, {2, 5}}, {{2, 3}, {2, 5}})
+      assert _range_precedes_range({{1, 2}, {1, :end}}, {{1, 3}, {2, 5}})
+      refute _range_precedes_range({{1, 2}, {2, 6}}, {{2, 3}, {2, 5}})
+      refute _range_precedes_range({{1, 2}, {2, :end}}, {{2, 3}, {2, 5}})
+    end
   end
 
   describe "the _push_change/2 function puts into an empty list" do
@@ -194,6 +209,37 @@ defmodule ExTermTest.Console.UpdateTest do
     test "a disjoint greater location is passed through" do
       assert [{1, 4}, {{1, 1}, {1, 2}}] === _push_change([{1, 4}], {{1, 1}, {1, 2}})
       assert [{2, 2}, {{1, 1}, {1, :end}}] === _push_change([{2, 2}], {{1, 1}, {1, :end}})
+    end
+  end
+
+  describe "the _push_change/2 function puts with a range and a range" do
+    test "a disjoint lesser range is passed through" do
+      assert [{{1, 4}, {1, 5}}, {{1, 1}, {1, 2}}] ===
+               _push_change([{{1, 4}, {1, 5}}], {{1, 1}, {1, 2}})
+    end
+
+    test "a preceding location is merged through" do
+      assert [{{1, 1}, {1, 5}}] === _push_change([{{1, 4}, {1, 5}}], {{1, 1}, {1, 3}})
+    end
+
+    test "an preceding location is merged through" do
+      assert [{{1, 1}, {1, 5}}] === _push_change([{{1, 4}, {1, 5}}], {{1, 1}, {1, 3}})
+    end
+
+    test "an overlapping location is merged through" do
+      assert [{{1, 1}, {1, 6}}] === _push_change([{{1, 4}, {1, 6}}], {{1, 1}, {1, 4}})
+      assert [{{1, 1}, {1, 6}}] === _push_change([{{1, 4}, {1, 6}}], {{1, 1}, {1, 5}})
+      assert [{{1, 1}, {1, 6}}] === _push_change([{{1, 4}, {1, 6}}], {{1, 1}, {1, 6}})
+    end
+
+    test "an identical location is merged through" do
+      assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 1}, {1, 4}}], {{1, 1}, {1, 4}})
+    end
+
+    test "an internal location is merged through" do
+      assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 1}, {1, 4}}], {{1, 1}, {1, 2}})
+      assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 1}, {1, 4}}], {{1, 2}, {1, 3}})
+      assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 1}, {1, 4}}], {{1, 2}, {1, 4}})
     end
   end
 end

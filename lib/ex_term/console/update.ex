@@ -66,7 +66,7 @@ defmodule ExTerm.Console.Update do
   false
   ```
   """
-  defguard is_location(item) when is_integer(elem(item, 1))
+  defguard is_location(item) when is_tuple(item) and is_integer(elem(item, 1))
 
   @doc """
   identifies if a term is a `t:cell_range/0`
@@ -128,19 +128,26 @@ defmodule ExTerm.Console.Update do
                   ((is_location(subject) and subject >= start(range) and subject <= finish(range)) or
                      (start(subject) >= start(range) and finish(subject) <= finish(range)))
 
-  # NOTE THERE ARE IS TYPE PROTECTION ON THE FOLLOWING
+  # NOTE THERE IS NO TYPE PROTECTION ON THIS FUNCTION
   defguardp is_next_line_cell(subject, compare)
             when col(compare) === :end and col(subject) === 1 and
                    row(subject) === row(compare) + 1
 
+  # NOTE THERE IS NO TYPE PROTECTION ON THIS FUNCTION
+  defguardp is_next_from(subject, compare)
+            when row(subject) === row(compare) and col(subject) !== :end and
+                   col(subject) === col(compare) + 1
+
+  defguardp is_adjoining_after(subject, compare)
+            when is_next_line_cell(subject, compare) or
+                   (is_location(compare) and is_next_from(subject, compare))
+
   defguardp is_disjoint_greater_two_location(subject, compare)
-            when (not is_next_line_cell(subject, compare) and
-                    row(subject) > row(compare)) or
-                   (row(subject) === row(compare) and col(compare) !== :end and
-                      col(subject) > col(compare) + 1)
+            when not is_adjoining_after(subject, compare) and subject > compare
 
   defguardp is_disjoint_greater_subject_location(subject, compare)
-            when (is_location(compare) and is_disjoint_greater_two_location(subject, compare)) or
+            when (is_location(compare) and
+                    is_disjoint_greater_two_location(subject, compare)) or
                    (is_range(compare) and
                       is_disjoint_greater_two_location(subject, finish(compare)))
 
@@ -156,21 +163,24 @@ defmodule ExTerm.Console.Update do
                   (is_range(subject) and is_disjoint_greater_subject_range(subject, compare))
 
   @doc false
-  defguard _location_precedes_location(first, second)
-           when is_location(first) and is_location(second) and row(first) === row(second) and
-                  col(first) + 1 === col(second)
+  defguard _location_precedes_location(first, second) when is_adjoining_after(second, first)
 
   @doc false
   defguard _location_precedes_range(first, second)
            when is_location(first) and is_range(second) and
-                  row(first) === row(start(second)) and col(first) + 1 === col(start(second))
+                  is_adjoining_after(start(second), first)
 
   @doc false
   defguard _range_precedes_location(first, second)
            when is_range(first) and is_location(second) and
-                  ((row(finish(first)) === row(second) and col(second) - 1 === col(finish(first))) or
-                     (row(finish(first)) + 1 === row(second) and col(finish(first)) === :end and
-                        col(second) === 1))
+                  is_adjoining_after(second, finish(first))
+
+  @doc false
+  defguard _range_precedes_range(first, second)
+           when is_range(first) and is_range(second) and
+                  finish(first) <= finish(second) and
+                  (finish(first) >= start(second) or
+                     _location_precedes_location(finish(first), start(second)))
 
   @doc false
   @spec _push_change(cell_changes, cell_change, cell_changes) :: cell_changes
@@ -190,7 +200,7 @@ defmodule ExTerm.Console.Update do
     Enum.reverse(ignored, list)
   end
 
-  def _push_change(list = [head | rest], change, ignored) when _is_in(head, change) do
+  def _push_change([head | rest], change, ignored) when _is_in(head, change) do
     Enum.reverse(ignored, [change | rest])
   end
 
@@ -222,6 +232,11 @@ defmodule ExTerm.Console.Update do
   def _push_change([head | rest], change, ignored)
       when _range_precedes_location(change, head) do
     Enum.reverse(ignored, [{start(change), head} | rest])
+  end
+
+  def _push_change([head | rest], change, ignored)
+      when _range_precedes_range(change, head) do
+    Enum.reverse(ignored, [{start(change), finish(head)} | rest])
   end
 
   def _push_change([head | rest], change, ignored) do
