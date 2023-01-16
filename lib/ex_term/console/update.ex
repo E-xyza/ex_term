@@ -201,12 +201,12 @@ defmodule ExTerm.Console.Update do
   end
 
   def _push_change([head | rest], change, ignored) when _is_in(head, change) do
-    Enum.reverse(ignored, [change | rest])
+    _push_change(rest, change, ignored)
   end
 
   def _push_change([head | rest], change, ignored)
       when _location_precedes_location(change, head) do
-    Enum.reverse(ignored, [{change, head} | rest])
+    _push_change(rest, {change, head}, ignored)
   end
 
   def _push_change([head | rest], change, ignored)
@@ -216,7 +216,7 @@ defmodule ExTerm.Console.Update do
 
   def _push_change([head | rest], change, ignored)
       when _location_precedes_range(change, head) do
-    Enum.reverse(ignored, [{change, finish(head)} | rest])
+    _push_change(rest, {change, finish(head)}, ignored)
   end
 
   def _push_change([head | rest], change, ignored)
@@ -225,18 +225,23 @@ defmodule ExTerm.Console.Update do
   end
 
   def _push_change([head | rest], change, ignored)
+      when _range_precedes_location(change, head) do
+    _push_change(rest, {start(change), head}, ignored)
+  end
+
+  def _push_change([head | rest], change, ignored)
       when _range_precedes_location(head, change) do
     Enum.reverse(ignored, [{start(head), change} | rest])
   end
 
   def _push_change([head | rest], change, ignored)
-      when _range_precedes_location(change, head) do
-    Enum.reverse(ignored, [{start(change), head} | rest])
+      when _range_precedes_range(change, head) do
+    _push_change(rest, {start(change), finish(head)}, ignored)
   end
 
   def _push_change([head | rest], change, ignored)
-      when _range_precedes_range(change, head) do
-    Enum.reverse(ignored, [{start(change), finish(head)} | rest])
+      when _range_precedes_range(head, change) do
+    Enum.reverse(ignored, [{start(head), finish(change)} | rest])
   end
 
   def _push_change([head | rest], change, ignored) do

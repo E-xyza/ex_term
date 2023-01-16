@@ -5,8 +5,6 @@ defmodule ExTermTest.Console.UpdateTest do
 
   import ExTerm.Console.Update,
     only: [
-      is_location: 1,
-      is_range: 1,
       _is_in: 2,
       _is_disjoint_greater: 2,
       _location_precedes_location: 2,
@@ -240,6 +238,57 @@ defmodule ExTermTest.Console.UpdateTest do
       assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 1}, {1, 4}}], {{1, 1}, {1, 2}})
       assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 1}, {1, 4}}], {{1, 2}, {1, 3}})
       assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 1}, {1, 4}}], {{1, 2}, {1, 4}})
+    end
+  end
+
+  describe "the _push_change/2 function can merge content" do
+    test "location, location, location" do
+      assert [{{1, 1}, {1, 3}}] === _push_change([{1, 3}, {1, 1}], {1, 2})
+    end
+
+    test "location, location, range" do
+      assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 3}, {1, 4}}, {1, 1}], {1, 2})
+      assert [{{1, 1}, {1, :end}}] === _push_change([{{1, 3}, {1, :end}}, {1, 1}], {1, 2})
+    end
+
+    test "location, range, location" do
+      assert [{{1, 1}, {1, 4}}] === _push_change([{1, 4}, {1, 1}], {{1, 2}, {1, 3}})
+      assert [{{1, 1}, {2, 1}}] === _push_change([{2, 1}, {1, 1}], {{1, 2}, {1, :end}})
+    end
+
+    test "location, range, range" do
+      assert [{{1, 1}, {1, 5}}] === _push_change([{{1, 4}, {1, 5}}, {1, 1}], {{1, 2}, {1, 3}})
+      assert [{{1, 1}, {2, 2}}] === _push_change([{{2, 1}, {2, 2}}, {1, 1}], {{1, 2}, {1, :end}})
+      assert [{{1, 1}, {1, :end}}] === _push_change([{{1, 4}, {1, :end}}, {1, 1}], {{1, 2}, {1, 3}})
+      assert [{{1, 1}, {2, :end}}] === _push_change([{{2, 1}, {2, :end}}, {1, 1}], {{1, 2}, {1, :end}})
+    end
+
+    test "range, location, location" do
+      assert [{{1, 1}, {1, 4}}] === _push_change([{1, 4}, {{1, 1}, {1, 2}}], {1, 3})
+      assert [{{1, 1}, {2, 2}}] === _push_change([{2, 2}, {{1, 1}, {1, :end}}], {2, 1})
+    end
+
+    test "range, location, range" do
+      assert [{{1, 1}, {1, 5}}] === _push_change([{{1, 4}, {1, 5}}, {{1, 1}, {1, 2}}], {1, 3})
+      assert [{{1, 1}, {2, 3}}] === _push_change([{{2, 2}, {2, 3}}, {{1, 1}, {1, :end}}], {2, 1})
+      assert [{{1, 1}, {1, :end}}] === _push_change([{{1, 4}, {1, :end}}, {{1, 1}, {1, 2}}], {1, 3})
+      assert [{{1, 1}, {2, :end}}] === _push_change([{{2, 2}, {2, :end}}, {{1, 1}, {1, :end}}], {2, 1})
+    end
+
+    test "range, range, location" do
+      assert [{{1, 1}, {1, 5}}] === _push_change([{1, 5}, {{1, 1}, {1, 2}}], {{1, 3}, {1, 4}})
+      assert [{{1, 1}, {2, 3}}] === _push_change([{2, 3}, {{1, 1}, {1, :end}}], {{2, 1}, {2, 2}})
+      assert [{{1, 1}, {2, 1}}] === _push_change([{2, 1}, {{1, 1}, {1, 2}}], {{1, 3}, {1, :end}})
+      assert [{{1, 1}, {3, 1}}] === _push_change([{3, 1}, {{1, 1}, {1, :end}}], {{2, 1}, {2, :end}})
+    end
+
+    test "range, range, range" do
+      assert [{{1, 1}, {1, 6}}] === _push_change([{{1, 5}, {1, 6}}, {{1, 1}, {1, 2}}], {{1, 3}, {1, 4}})
+    end
+
+    test "ranges that eat locations" do
+      assert [{{1, 1}, {1, 9}}] === _push_change([{1, 5}, {1, 3}], {{1, 1}, {1, 9}})
+      assert [{{1, 1}, {1, :end}}] === _push_change([{1, 5}, {1, 3}], {{1, 1}, {1, :end}})
     end
   end
 end
