@@ -29,6 +29,12 @@ defmodule ExTermTest.Console.UpdateTest do
       refute _is_in({2, 1}, {{1, 2}, {1, :end}})
     end
 
+    test "correctly identifies when a location is in an end range" do
+      assert _is_in({1, 3}, {{1, 1}, :end})
+      assert _is_in({2, 3}, {{1, 1}, :end})
+      refute _is_in({1, 1}, {{1, 2}, :end})
+    end
+
     test "correctly identifies when a range is in a range" do
       assert _is_in({{1, 1}, {1, 3}}, {{1, 1}, {1, 3}})
       assert _is_in({{1, 1}, {1, 2}}, {{1, 1}, {1, 3}})
@@ -50,9 +56,27 @@ defmodule ExTermTest.Console.UpdateTest do
       refute _is_in({{1, 5}, {1, 6}}, {{1, 3}, {1, 4}})
       refute _is_in({{2, 1}, {2, 2}}, {{1, 3}, {1, :end}})
     end
+
+    test "correctly identifies when a range is in an end range" do
+      # disjoint, before
+      refute _is_in({{1, 1}, {1, 2}}, {{1, 3}, :end})
+      # overlapping, before
+      refute _is_in({{1, 1}, {1, 3}}, {{1, 3}, :end})
+      refute _is_in({{1, 1}, {1, 4}}, {{1, 3}, :end})
+      refute _is_in({{1, 1}, {1, :end}}, {{1, 3}, :end})
+      # properly inside
+      assert _is_in({{1, 3}, {1, 4}}, {{1, 3}, :end})
+      assert _is_in({{1, 3}, {1, 4}}, {{1, 3}, :end})
+      assert _is_in({{1, 3}, {1, 4}}, {{1, 3}, :end})
+    end
+
+    test "correctly identifies when an end range is in an end range" do
+      refute _is_in({{1, 1}, :end}, {{2, 2}, :end})
+      assert _is_in({{2, 2}, :end}, {{1, 1}, :end})
+    end
   end
 
-  describe "the _is_disjoint_greater/2 guard" do
+  describe "the _is_disjoint_greater/2 guard for locations" do
     test "correctly identifies disjoint locations" do
       refute _is_disjoint_greater({1, 1}, {1, 3})
       refute _is_disjoint_greater({1, 2}, {1, 3})
@@ -78,10 +102,123 @@ defmodule ExTermTest.Console.UpdateTest do
       assert _is_disjoint_greater({2, 2}, {{1, 3}, {1, :end}})
     end
 
-    test "correctly identifies disjoint location compared to end range"
+    test "correctly identifies disjoint locations cannot be disjoint greater than an end range" do
+      refute _is_disjoint_greater({1, 1}, {{1, 2}, :end})
+      refute _is_disjoint_greater({1, 2}, {{1, 2}, :end})
+      refute _is_disjoint_greater({1, 3}, {{1, 2}, :end})
+      refute _is_disjoint_greater({2, 2}, {{1, 2}, :end})
+    end
   end
 
-  describe "the precede function" do
+  describe "the _is_disjoint_greater/2 guard for basic ranges" do
+    test "correctly identifies disjoint locations" do
+      refute _is_disjoint_greater({{1, 1}, {1, 2}}, {1, 4})
+      refute _is_disjoint_greater({{1, 2}, {1, 3}}, {1, 4})
+      refute _is_disjoint_greater({{1, 3}, {1, 4}}, {1, 4})
+      refute _is_disjoint_greater({{1, 4}, {1, 5}}, {1, 4})
+      refute _is_disjoint_greater({{1, 5}, {1, 6}}, {1, 4})
+      assert _is_disjoint_greater({{1, 6}, {1, 7}}, {1, 4})
+    end
+
+    test "correctly identifies disjoint locations compared to normal range" do
+      refute _is_disjoint_greater({{1, 1}, {1, 2}}, {{1, 4}, {1, 5}})
+      refute _is_disjoint_greater({{1, 2}, {1, 3}}, {{1, 4}, {1, 5}})
+      refute _is_disjoint_greater({{1, 3}, {1, 4}}, {{1, 4}, {1, 5}})
+      refute _is_disjoint_greater({{1, 4}, {1, 5}}, {{1, 4}, {1, 5}})
+      refute _is_disjoint_greater({{1, 5}, {1, 6}}, {{1, 4}, {1, 5}})
+      refute _is_disjoint_greater({{1, 6}, {1, 7}}, {{1, 4}, {1, 5}})
+      assert _is_disjoint_greater({{1, 7}, {1, 8}}, {{1, 4}, {1, 5}})
+    end
+
+    test "correctly identifies disjoint location compared to endline range" do
+      refute _is_disjoint_greater({{1, 1}, {1, 2}}, {{1, 3}, {2, :end}})
+      refute _is_disjoint_greater({{1, 2}, {1, 3}}, {{1, 3}, {2, :end}})
+      refute _is_disjoint_greater({{1, 3}, {1, 4}}, {{1, 3}, {2, :end}})
+      refute _is_disjoint_greater({{3, 1}, {3, 2}}, {{1, 3}, {2, :end}})
+      assert _is_disjoint_greater({{3, 2}, {3, 3}}, {{1, 3}, {2, :end}})
+    end
+
+    test "correctly identifies disjoint locations cannot be disjoint greater than an end range" do
+      refute _is_disjoint_greater({{1, 1}, {1, 2}}, {{1, 3}, :end})
+      refute _is_disjoint_greater({{1, 2}, {1, 3}}, {{1, 3}, :end})
+      refute _is_disjoint_greater({{1, 3}, {1, 4}}, {{1, 3}, :end})
+      refute _is_disjoint_greater({{2, 2}, {2, 3}}, {{1, 3}, :end})
+    end
+  end
+
+  describe "the _is_disjoint_greater/2 guard for endline ranges" do
+    test "correctly identifies disjoint locations" do
+      refute _is_disjoint_greater({{1, 1}, {1, :end}}, {1, 4})
+      refute _is_disjoint_greater({{1, 2}, {1, :end}}, {1, 4})
+      refute _is_disjoint_greater({{1, 3}, {1, :end}}, {1, 4})
+      refute _is_disjoint_greater({{1, 4}, {1, :end}}, {1, 4})
+      refute _is_disjoint_greater({{1, 5}, {1, :end}}, {1, 4})
+      assert _is_disjoint_greater({{1, 6}, {1, :end}}, {1, 4})
+    end
+
+    test "correctly identifies disjoint locations compared to normal range" do
+      refute _is_disjoint_greater({{1, 1}, {1, :end}}, {{1, 4}, {1, 5}})
+      refute _is_disjoint_greater({{1, 2}, {1, :end}}, {{1, 4}, {1, 5}})
+      refute _is_disjoint_greater({{1, 3}, {1, :end}}, {{1, 4}, {1, 5}})
+      refute _is_disjoint_greater({{1, 4}, {1, :end}}, {{1, 4}, {1, 5}})
+      refute _is_disjoint_greater({{1, 5}, {1, :end}}, {{1, 4}, {1, 5}})
+      refute _is_disjoint_greater({{1, 6}, {1, :end}}, {{1, 4}, {1, 5}})
+      assert _is_disjoint_greater({{1, 7}, {1, :end}}, {{1, 4}, {1, 5}})
+    end
+
+    test "correctly identifies disjoint location compared to endline range" do
+      refute _is_disjoint_greater({{1, 1}, {1, :end}}, {{1, 3}, {2, :end}})
+      refute _is_disjoint_greater({{1, 2}, {1, :end}}, {{1, 3}, {2, :end}})
+      refute _is_disjoint_greater({{1, 3}, {1, :end}}, {{1, 3}, {2, :end}})
+      refute _is_disjoint_greater({{3, 1}, {3, :end}}, {{1, 3}, {2, :end}})
+      assert _is_disjoint_greater({{3, 2}, {3, :end}}, {{1, 3}, {2, :end}})
+    end
+
+    test "correctly identifies disjoint locations cannot be disjoint greater than an end range" do
+      refute _is_disjoint_greater({{1, 1}, {1, :end}}, {{1, 3}, :end})
+      refute _is_disjoint_greater({{1, 2}, {1, :end}}, {{1, 3}, :end})
+      refute _is_disjoint_greater({{1, 3}, {1, :end}}, {{1, 3}, :end})
+      refute _is_disjoint_greater({{2, 2}, {2, :end}}, {{1, 3}, :end})
+    end
+  end
+
+  describe "the _is_disjoint_greater/2 guard for end ranges" do
+    test "correctly identifies disjoint locations" do
+      refute _is_disjoint_greater({{1, 1}, :end}, {1, 4})
+      refute _is_disjoint_greater({{1, 2}, :end}, {1, 4})
+      refute _is_disjoint_greater({{1, 3}, :end}, {1, 4})
+      refute _is_disjoint_greater({{1, 4}, :end}, {1, 4})
+      refute _is_disjoint_greater({{1, 5}, :end}, {1, 4})
+      assert _is_disjoint_greater({{1, 6}, :end}, {1, 4})
+    end
+
+    test "correctly identifies disjoint locations compared to normal range" do
+      refute _is_disjoint_greater({{1, 1}, :end}, {{1, 4}, {1, 5}})
+      refute _is_disjoint_greater({{1, 2}, :end}, {{1, 4}, {1, 5}})
+      refute _is_disjoint_greater({{1, 3}, :end}, {{1, 4}, {1, 5}})
+      refute _is_disjoint_greater({{1, 4}, :end}, {{1, 4}, {1, 5}})
+      refute _is_disjoint_greater({{1, 5}, :end}, {{1, 4}, {1, 5}})
+      refute _is_disjoint_greater({{1, 6}, :end}, {{1, 4}, {1, 5}})
+      assert _is_disjoint_greater({{1, 7}, :end}, {{1, 4}, {1, 5}})
+    end
+
+    test "correctly identifies disjoint location compared to endline range" do
+      refute _is_disjoint_greater({{1, 1}, :end}, {{1, 3}, {2, :end}})
+      refute _is_disjoint_greater({{1, 2}, :end}, {{1, 3}, {2, :end}})
+      refute _is_disjoint_greater({{1, 3}, :end}, {{1, 3}, {2, :end}})
+      refute _is_disjoint_greater({{3, 1}, :end}, {{1, 3}, {2, :end}})
+      assert _is_disjoint_greater({{3, 2}, :end}, {{1, 3}, {2, :end}})
+    end
+
+    test "correctly identifies disjoint locations cannot be disjoint greater than an end range" do
+      refute _is_disjoint_greater({{1, 1}, :end}, {{1, 3}, :end})
+      refute _is_disjoint_greater({{1, 2}, :end}, {{1, 3}, :end})
+      refute _is_disjoint_greater({{1, 3}, :end}, {{1, 3}, :end})
+      refute _is_disjoint_greater({{2, 2}, :end}, {{1, 3}, :end})
+    end
+  end
+
+  describe "the precede functions" do
     test "_location_precedes_location/2 identifies next-door locations" do
       assert _location_precedes_location({1, 1}, {1, 2})
       refute _location_precedes_location({1, 1}, {1, 3})
@@ -259,8 +396,12 @@ defmodule ExTermTest.Console.UpdateTest do
     test "location, range, range" do
       assert [{{1, 1}, {1, 5}}] === _push_change([{{1, 4}, {1, 5}}, {1, 1}], {{1, 2}, {1, 3}})
       assert [{{1, 1}, {2, 2}}] === _push_change([{{2, 1}, {2, 2}}, {1, 1}], {{1, 2}, {1, :end}})
-      assert [{{1, 1}, {1, :end}}] === _push_change([{{1, 4}, {1, :end}}, {1, 1}], {{1, 2}, {1, 3}})
-      assert [{{1, 1}, {2, :end}}] === _push_change([{{2, 1}, {2, :end}}, {1, 1}], {{1, 2}, {1, :end}})
+
+      assert [{{1, 1}, {1, :end}}] ===
+               _push_change([{{1, 4}, {1, :end}}, {1, 1}], {{1, 2}, {1, 3}})
+
+      assert [{{1, 1}, {2, :end}}] ===
+               _push_change([{{2, 1}, {2, :end}}, {1, 1}], {{1, 2}, {1, :end}})
     end
 
     test "range, location, location" do
@@ -271,19 +412,26 @@ defmodule ExTermTest.Console.UpdateTest do
     test "range, location, range" do
       assert [{{1, 1}, {1, 5}}] === _push_change([{{1, 4}, {1, 5}}, {{1, 1}, {1, 2}}], {1, 3})
       assert [{{1, 1}, {2, 3}}] === _push_change([{{2, 2}, {2, 3}}, {{1, 1}, {1, :end}}], {2, 1})
-      assert [{{1, 1}, {1, :end}}] === _push_change([{{1, 4}, {1, :end}}, {{1, 1}, {1, 2}}], {1, 3})
-      assert [{{1, 1}, {2, :end}}] === _push_change([{{2, 2}, {2, :end}}, {{1, 1}, {1, :end}}], {2, 1})
+
+      assert [{{1, 1}, {1, :end}}] ===
+               _push_change([{{1, 4}, {1, :end}}, {{1, 1}, {1, 2}}], {1, 3})
+
+      assert [{{1, 1}, {2, :end}}] ===
+               _push_change([{{2, 2}, {2, :end}}, {{1, 1}, {1, :end}}], {2, 1})
     end
 
     test "range, range, location" do
       assert [{{1, 1}, {1, 5}}] === _push_change([{1, 5}, {{1, 1}, {1, 2}}], {{1, 3}, {1, 4}})
       assert [{{1, 1}, {2, 3}}] === _push_change([{2, 3}, {{1, 1}, {1, :end}}], {{2, 1}, {2, 2}})
       assert [{{1, 1}, {2, 1}}] === _push_change([{2, 1}, {{1, 1}, {1, 2}}], {{1, 3}, {1, :end}})
-      assert [{{1, 1}, {3, 1}}] === _push_change([{3, 1}, {{1, 1}, {1, :end}}], {{2, 1}, {2, :end}})
+
+      assert [{{1, 1}, {3, 1}}] ===
+               _push_change([{3, 1}, {{1, 1}, {1, :end}}], {{2, 1}, {2, :end}})
     end
 
     test "range, range, range" do
-      assert [{{1, 1}, {1, 6}}] === _push_change([{{1, 5}, {1, 6}}, {{1, 1}, {1, 2}}], {{1, 3}, {1, 4}})
+      assert [{{1, 1}, {1, 6}}] ===
+               _push_change([{{1, 5}, {1, 6}}, {{1, 1}, {1, 2}}], {{1, 3}, {1, 4}})
     end
 
     test "ranges that eat locations" do

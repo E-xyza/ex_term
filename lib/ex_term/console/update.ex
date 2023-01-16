@@ -12,8 +12,11 @@ defmodule ExTerm.Console.Update do
 
   @type row_end :: {pos_integer, :end}
   @type cell_range :: {Console.location(), Console.location() | row_end}
-  @type cell_change :: Console.location() | cell_range
+  @type end_range :: {Console.location(), :end}
+  @type cell_change :: Console.location() | cell_range | end_range
   @type cell_changes :: [cell_change]
+
+  alias ExTerm.Console
 
   @typedoc """
   ### fields
@@ -34,6 +37,8 @@ defmodule ExTerm.Console.Update do
       `t:Console.location/0` and `{row, :end}`.  This should be used in lieu of
       a single location if the location is the last character on the line, OR
       if a location range ends at last character on the line.
+    - location range with end-of-console, reppresnted by a twople of
+      `t:Console.location/0` and `:end`.
     Note that the `cells` *should* be in reverse-sorted order, and *should* be
     compacted.
   """
@@ -55,7 +60,7 @@ defmodule ExTerm.Console.Update do
   @doc """
   identifies if a term is a `t:Console.location/0`
 
-  Optimized to distinguish between `t:Console.location/0` and `t:cell_range/0`.
+  Optimized to distinguish between `t:Console.location/0`, `t:cell_range/0`, and `t:end_range/0`.
   May not correctly type other terms.
 
   ```elixir
@@ -64,6 +69,10 @@ defmodule ExTerm.Console.Update do
   true
   iex> Update.is_location({{1, 1}, {1, 2}})
   false
+  iex> Update.is_location({{1, 1}, {1, :end}})
+  false
+  iex> Update.is_location({{1, 1}, :end})
+  false
   ```
   """
   defguard is_location(item) when is_tuple(item) and is_integer(elem(item, 1))
@@ -71,7 +80,8 @@ defmodule ExTerm.Console.Update do
   @doc """
   identifies if a term is a `t:cell_range/0`
 
-  Optimized to distinguish between `t:Console.location/0` and `t:cell_range/0`.
+  Optimized to distinguish between `t:Console.location/0`, `t:cell_range/0`, and `t:end_range/0`.
+
   May not correctly type other terms.
 
   ```elixir
@@ -83,10 +93,34 @@ defmodule ExTerm.Console.Update do
   iex> Update.is_range({{1, 1}, {1, :end}})
   true
   iex> Update.is_range({{1, 1}, :end})
+  false
+  ```
+  """
+  defguard is_range(item) when is_tuple(elem(item, 1))
+
+  @doc """
+  identifies if a term is a `t:end_range/0`
+
+  Optimized to distinguish between `t:Console.location/0`, `t:cell_range/0`, and `t:end_range/0`.
+
+  May not correctly type other terms.
+
+  ```elixir
+  iex> alias ExTerm.Console.Update
+  iex> Update.is_end_range({1, 2})
+  false
+  iex> Update.is_end_range({{1, 1}, {1, 2}})
+  false
+  iex> Update.is_end_range({{1, 1}, {1, :end}})
+  false
+  iex> Update.is_end_range({{1, 1}, :end})
   true
   ```
   """
-  defguard is_range(item) when is_tuple(elem(item, 0))
+  defguard is_end_range(item) when elem(item, 1) === :end
+
+  # for internal use only.
+  defguardp is_any_range(item) when is_tuple(elem(item, 0))
 
   @doc false
   # note: this needs to be inside of a mutation transaction
@@ -122,11 +156,21 @@ defmodule ExTerm.Console.Update do
   defguardp start(range) when elem(range, 0)
   defguardp finish(range) when elem(range, 1)
 
+  defguardp is_in_end_range(subject, range)
+            when is_end_range(range) and (
+              (is_location(subject) and subject >= start(range)) or
+              (is_any_range(subject) and start(subject) >= start(range)))
+
+
+  defguardp is_in_range(subject, range)
+            when is_range(range) and
+                   ((is_location(subject) and subject >= start(range) and
+                       subject <= finish(range)) or
+                      (start(subject) >= start(range) and finish(subject) <= finish(range)))
+
   @doc false
   defguard _is_in(subject, range)
-           when is_range(range) and
-                  ((is_location(subject) and subject >= start(range) and subject <= finish(range)) or
-                     (start(subject) >= start(range) and finish(subject) <= finish(range)))
+           when is_in_end_range(subject, range) or is_in_range(subject, range)
 
   # NOTE THERE IS NO TYPE PROTECTION ON THIS FUNCTION
   defguardp is_next_line_cell(subject, compare)
@@ -160,7 +204,7 @@ defmodule ExTerm.Console.Update do
   @doc false
   defguard _is_disjoint_greater(subject, compare)
            when (is_location(subject) and is_disjoint_greater_subject_location(subject, compare)) or
-                  (is_range(subject) and is_disjoint_greater_subject_range(subject, compare))
+                  (is_any_range(subject) and is_disjoint_greater_subject_range(subject, compare))
 
   @doc false
   defguard _location_precedes_location(first, second) when is_adjoining_after(second, first)
