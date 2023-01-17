@@ -325,14 +325,34 @@ defmodule ExTerm.Console do
       tuple
   end
 
-  def move_cursor(console, new_cursor) do
+  def move_cursor(console, new_cursor = {row, column}) do
     old_cursor = cursor(console)
+
+    changes =
+      case {last_cell(console), has?(console, new_cursor)} do
+        {_, true} ->
+          [old_cursor, new_cursor]
+
+        {{last_row, _}, false} when last_row + 1 === row and column === 1 ->
+          [old_cursor]
+
+        {last, false} ->
+          raise "cursor move exceeded the console buffer (#{move_msg(console, last, new_cursor)})"
+      end
+
     Update.change_cursor(new_cursor)
 
     console
-    |> Update.push_cells(old_cursor)
-    |> Update.push_cells(new_cursor)
+    |> Update.push_cells(changes)
     |> put_metadata(:cursor, new_cursor)
+  end
+
+  def move_msg(_, {last_row, _}, {cursor_row, _}) when cursor_row > last_row do
+    "cursor row #{cursor_row} is beyond the last console row #{last_row}"
+  end
+
+  def move_msg(console, _, {cursor_row, cursor_col}) do
+    "cursor column #{cursor_col} is beyond the last column of row #{cursor_row}: #{columns(console, cursor_row)}"
   end
 
   # functional utilities
@@ -385,6 +405,11 @@ defmodule ExTerm.Console do
   """
   def full_row(console, row, with_sentinel? \\ false) do
     select(console, full_row_ms(row, with_sentinel?))
+  end
+
+  @spec has?(t, location) :: boolean
+  def has?(console, location) do
+    not is_nil(lookup(console, location))
   end
 
   @spec last_column?(t, location) :: boolean

@@ -31,8 +31,39 @@ defmodule ExTermTest.Console.MoveCursorTest do
       assert_receive %Update{cursor: {1, 6}, changes: [{1, 6}, {1, 1}]}
     end
 
-    test "to one after the last line, no update is issued"
+    test "to one after the last line, no update is issued", %{console: console} do
+      Helpers.transaction console, :mutate do
+        Console.new_row(console)
+      end
 
-    test "to a nonexistent place, it raises"
+      assert_receive %Update{changes: [{{1, 1}, {1, :end}}]}
+
+      Helpers.transaction console, :mutate do
+        Console.move_cursor(console, {2, 1})
+      end
+
+      assert_receive %Update{cursor: {2, 1}, changes: [{1, 1}]}
+    end
+
+    test "to a nonexistent place because the column is too far, it raises", %{console: console} do
+      assert_raise RuntimeError,
+                   "cursor move exceeded the console buffer (cursor column 90 is beyond the last column of row 1: 80)",
+                   fn ->
+                     Helpers.transaction console, :mutate do
+                       Console.new_row(console)
+                       Console.move_cursor(console, {1, 90})
+                     end
+                   end
+    end
+
+    test "to a nonexistent place because the row is too far, it raises", %{console: console} do
+      assert_raise RuntimeError,
+                   "cursor move exceeded the console buffer (cursor row 3 is beyond the last console row 0)",
+                   fn ->
+                     Helpers.transaction console, :mutate do
+                       Console.move_cursor(console, {3, 4})
+                     end
+                   end
+    end
   end
 end

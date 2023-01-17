@@ -124,8 +124,15 @@ defmodule ExTerm.Console.Update do
   defguardp col(location) when elem(location, 1)
 
   @doc false
-  @spec push_cells(Console.t(), cell_change) :: Console.t
+  @spec push_cells(Console.t(), cell_change | [cell_change]) :: Console.t()
   # note: this needs to be inside of a mutation transaction
+  def push_cells(console, []), do: console
+
+  def push_cells(console, [head | rest]) do
+    push_cells(console, head)
+    push_cells(console, rest)
+  end
+
   def push_cells(console, location) do
     # check to see if the column is at the end of its row, in which case, amend
     # it to be a "row/end", for the purposes of compaction.
