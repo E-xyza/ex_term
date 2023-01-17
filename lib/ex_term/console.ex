@@ -73,11 +73,11 @@ defmodule ExTerm.Console do
   @spec put_metadata(t, keyword) :: t
   @spec delete_metadata(t, atom) :: t
 
-  #@spec move_cursor(t, location) :: t
+  @spec move_cursor(t, location) :: t
 
   # cell access
   @spec get(t, location) :: nil | Cell.t()
-  @spec get(t, Update.cell_range() | Update.end_range()) :: [Cell.t]
+  @spec get(t, Update.cell_range() | Update.end_range()) :: [Cell.t()]
 
   # primitive cell mutation
   @spec put_cell(t, location, Cell.t()) :: t
@@ -86,7 +86,7 @@ defmodule ExTerm.Console do
   # complex cell mutation
   @spec put_string(t, String.t()) :: t
   @spec insert_string(t, String.t(), row :: pos_integer()) :: t
-  #@spec clear(t) :: t
+  # @spec clear(t) :: t
 
   #############################################################################
   ## GUARDS
@@ -131,7 +131,6 @@ defmodule ExTerm.Console do
       )
     end
   end
-
 
   def layout(console) do
     get_metadata(console, :layout)
@@ -222,16 +221,20 @@ defmodule ExTerm.Console do
 
   def new_row(console, row) when is_integer(row) do
     # does row exist?
-    new_row_columns = case columns(console, row) do
-      0 ->
-        raise "attempted to insert row into row #{row} but the destination does not exist"
-      columns -> columns
-    end
+    new_row_columns =
+      case columns(console, row) do
+        0 ->
+          raise "attempted to insert row into row #{row} but the destination does not exist"
+
+        columns ->
+          columns
+      end
 
     # note that if the console cursor row is bigger than the row we'll need to move it.
     case cursor(console) do
       {cursor_row, cursor_column} when cursor_row >= row ->
         Update.change_cursor({cursor_row + 1, cursor_column})
+
       _ ->
         :ok
     end
@@ -239,16 +242,18 @@ defmodule ExTerm.Console do
     # register the update that we will need to do.
     Update.push_cells(console, {{row, 1}, :end})
 
-    rows_to_move = console
-    |> select(rows_from(row))
-    |> Enum.group_by(&elem(location(&1), 0))
-    |> bump_rows
+    rows_to_move =
+      console
+      |> select(rows_from(row))
+      |> Enum.group_by(&elem(location(&1), 0))
+      |> bump_rows
 
-    insertion = 1..new_row_columns
-    |> Enum.reduce(rows_to_move, fn index, so_far ->
-      [{{row, index}, %Cell{}} | so_far]
-    end)
-    |> List.insert_at(0, {{row, new_row_columns + 1}, Cell.sentinel()})
+    insertion =
+      1..new_row_columns
+      |> Enum.reduce(rows_to_move, fn index, so_far ->
+        [{{row, index}, %Cell{}} | so_far]
+      end)
+      |> List.insert_at(0, {{row, new_row_columns + 1}, Cell.sentinel()})
 
     insert(console, insertion)
   end
@@ -320,9 +325,13 @@ defmodule ExTerm.Console do
       tuple
   end
 
-  @spec move_cursor(t(), any) :: t()
   def move_cursor(console, new_cursor) do
+    old_cursor = cursor(console)
+    Update.change_cursor(new_cursor)
+
     console
+    |> Update.push_cells(old_cursor)
+    |> Update.push_cells(new_cursor)
     |> put_metadata(:cursor, new_cursor)
   end
 

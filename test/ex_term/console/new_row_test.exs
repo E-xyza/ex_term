@@ -58,11 +58,13 @@ defmodule ExTermTest.Console.NewRowTest do
       console = Console.new(handle_update: &updates/1)
 
       # note that row 1 doesn't exist
-      assert_raise RuntimeError, "attempted to insert row into row 1 but the destination does not exist", fn ->
-        Helpers.transaction console, :mutate do
-          Console.new_row(console, 1)
-        end
-      end
+      assert_raise RuntimeError,
+                   "attempted to insert row into row 1 but the destination does not exist",
+                   fn ->
+                     Helpers.transaction console, :mutate do
+                       Console.new_row(console, 1)
+                     end
+                   end
     end
 
     test "will insert as expected" do
@@ -70,11 +72,12 @@ defmodule ExTermTest.Console.NewRowTest do
       console = Console.new(handle_update: &updates/1)
 
       # SETUP
-      cursor = Helpers.transaction console, :mutate do
-        Console.new_row(console)
-        Console.put_cell(console, {1, 1}, %Cell{char: "a"})
-        Console.cursor(console)
-      end
+      cursor =
+        Helpers.transaction console, :mutate do
+          Console.new_row(console)
+          Console.put_cell(console, {1, 1}, %Cell{char: "a"})
+          Console.cursor(console)
+        end
 
       assert cursor === {1, 1}
       assert_receive %Update{changes: [{{1, 1}, {1, :end}}]}

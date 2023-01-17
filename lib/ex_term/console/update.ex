@@ -124,7 +124,7 @@ defmodule ExTerm.Console.Update do
   defguardp col(location) when elem(location, 1)
 
   @doc false
-  @spec push_cells(Console.t, cell_change) :: :ok
+  @spec push_cells(Console.t(), cell_change) :: Console.t
   # note: this needs to be inside of a mutation transaction
   def push_cells(console, location) do
     # check to see if the column is at the end of its row, in which case, amend
@@ -135,14 +135,16 @@ defmodule ExTerm.Console.Update do
       update = get_current_update()
       put_current_update(%{update | changes: _push_change(update.changes, location)})
     end
-    :ok
+
+    console
   end
 
-  @spec change_cursor(Console.location) :: :ok
+  @spec change_cursor(Console.location()) :: :ok
   def change_cursor(location) do
     get_current_update()
     |> Map.put(:cursor, location)
     |> put_current_update()
+
     :ok
   end
 
@@ -160,7 +162,7 @@ defmodule ExTerm.Console.Update do
     unless update === %__MODULE__{cursor: nil, changes: []} do
       Console.update_with(console, update)
     end
-    
+
     console
   end
 
