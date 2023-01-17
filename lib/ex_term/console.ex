@@ -76,7 +76,8 @@ defmodule ExTerm.Console do
   #@spec move_cursor(t, location) :: t
 
   # cell access
-  @spec get(t, location) :: nil | Cell.t() | [Cell.t]
+  @spec get(t, location) :: nil | Cell.t()
+  @spec get(t, Update.cell_range() | Update.end_range()) :: [Cell.t]
 
   # primitive cell mutation
   @spec put_cell(t, location, Cell.t()) :: t
@@ -103,6 +104,8 @@ defmodule ExTerm.Console do
            when permission(console) === :public or self() === custodian(console)
 
   defguard is_local(console) when node(custodian(console)) === node()
+
+  defguard location(cellinfo) when elem(cellinfo, 0)
 
   #############################################################################
   ## CONSOLE ETS interactions
@@ -147,7 +150,6 @@ defmodule ExTerm.Console do
   defmatchspecp get_ms({key, value}) do
     {{^key, ^value}, cell} -> cell
   end
-
 
   def get(console, location) do
     console
@@ -200,9 +202,8 @@ defmodule ExTerm.Console do
     |> insert({location, char})
   end
 
-  # compound operations
-  defmatchspecp bump_rows_after(line) do
-    {{row, column}, cell} when row >= line -> {{row + 1, column}, cell}
+  defmatchspecp rows_from(starting_row) do
+    tuple = {{row, _}, cell} when row >= starting_row -> tuple
   end
 
   def new_row(console, insertion_at \\ :end)
@@ -220,19 +221,55 @@ defmodule ExTerm.Console do
   end
 
   def new_row(console, row) when is_integer(row) do
+    # does row exist?
+    new_row_columns = case columns(console, row) do
+      0 ->
+        raise "attempted to insert row into row #{row} but the destination does not exist"
+      columns -> columns
+    end
+
+    # note that if the console cursor row is bigger than the row we'll need to move it.
+    case cursor(console) do
+      {cursor_row, cursor_column} when cursor_row >= row ->
+        Update.change_cursor({cursor_row + 1, cursor_column})
+      _ ->
+        :ok
+    end
+
+    # register the update that we will need to do.
     Update.push_cells(console, {{row, 1}, :end})
 
-    new_row_columns = columns(console, row)
+    rows_to_move = console
+    |> select(rows_from(row))
+    |> Enum.group_by(&elem(location(&1), 0))
+    |> bump_rows
 
-    moved_rows = select(console, bump_rows_after(row))
+    insertion = 1..new_row_columns
+    |> Enum.reduce(rows_to_move, fn index, so_far ->
+      [{{row, index}, %Cell{}} | so_far]
+    end)
+    |> List.insert_at(0, {{row, new_row_columns + 1}, Cell.sentinel()})
 
-    update =
-      row
-      |> make_blank_row(new_row_columns)
-      |> Enum.reverse(moved_rows)
+    insert(console, insertion)
+  end
 
-    console
-    |> insert(update)
+  defp bump_rows(rows) do
+    Enum.flat_map(rows, fn
+      {row, list} when is_map_key(rows, row + 1) ->
+        list
+        |> Enum.zip(rows[row + 1])
+        |> Enum.map(fn
+          # sentinel for destination row
+          {_, dest = {_, %{char: "\n"}}} -> dest
+          # sentinel for source row
+          {{_, %{char: "\n"}}, dest} -> dest
+          {{{row, col}, cell}, _} -> {{row + 1, col}, cell}
+        end)
+
+      {_, list} ->
+        # last line gets copied over outright
+        Enum.map(list, fn {{row, col}, cell} -> {{row + 1, col}, cell} end)
+    end)
   end
 
   def put_string(console, string) do
@@ -281,11 +318,6 @@ defmodule ExTerm.Console do
 
     tuple = {{row, column}, cell} when row > row_start and row < row_end ->
       tuple
-  end
-
-  @spec cells(t, location, location) :: [cellinfo]
-  def cells(console, {row_start, column_start}, {row_end, column_end}) do
-    select(console, cell_range_ms(row_start, column_start, row_end, column_end))
   end
 
   @spec move_cursor(t(), any) :: t()

@@ -86,8 +86,9 @@ defmodule ExTerm.Console.Helpers do
         quote do
           alias ExTerm.Console.Update
           Update.init()
-          unquote(code)
+          result = unquote(code)
           Update.flush(unquote(console))
+          result
         end
     end
 
