@@ -38,14 +38,6 @@ defmodule ExTerm.Console do
            last_cell :: location}
   @type cellinfo :: {location, Cell.t()}
 
-  # message typing
-  @type update_msg :: update
-  defmacro update_msg(from: from, to: to, cursor: cursor, last_cell: last_cell) do
-    quote do
-      {:xterm_console_update, unquote(from), unquote(to), unquote(cursor), unquote(last_cell)}
-    end
-  end
-
   ############################################################################
   ## rendering function
 
@@ -76,8 +68,7 @@ defmodule ExTerm.Console do
   @spec move_cursor(t, location) :: t
 
   # cell access
-  @spec get(t, location) :: nil | Cell.t()
-  @spec get(t, Update.cell_range() | Update.end_range()) :: [Cell.t()]
+  @spec get(t, location | Update.cell_range() | Update.end_range()) :: nil | Cell.t() | [Cell.t()]
 
   # primitive cell mutation
   @spec put_cell(t, location, Cell.t()) :: t
@@ -146,11 +137,13 @@ defmodule ExTerm.Console do
 
   # basic access functions
 
-  defmatchspecp get_ms({key, value}) do
-    {{^key, ^value}, cell} -> cell
+  require Update
+
+  defmatchspecp get_ms(location) when Update.is_location(location) do
+    {^location, cell} -> cell
   end
 
-  def get(console, location) do
+  def get(console, location) when Update.is_location(location) do
     console
     |> select(get_ms(location))
     |> case do
@@ -213,10 +206,7 @@ defmodule ExTerm.Console do
     {_rows, columns} = layout(console)
     Update.push_cells(console, {{new_row, 1}, {new_row, :end}})
 
-    # note it's okay to put that last one out of order because ets will
-    # order it correctly.
-    console
-    |> insert(make_blank_row(new_row, columns))
+    insert(console, make_blank_row(new_row, columns))
   end
 
   def new_row(console, row) when is_integer(row) do

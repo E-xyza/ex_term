@@ -61,6 +61,7 @@ defmodule ExTerm do
   alias ExTerm.Console
   alias ExTerm.Console.Cell
   alias ExTerm.Console.Helpers
+  alias ExTerm.Console.Update
   alias Phoenix.LiveView.JS
 
   require Console
@@ -184,10 +185,10 @@ defmodule ExTerm do
   end
 
   def handle_info(
-        Console.update_msg(from: from, to: to, cursor: cursor, last_cell: last_cell),
+        update = %Update{},
         socket
       ) do
-    dispatch(:handle_update, [socket.assigns.console, from, to, cursor, last_cell], socket)
+    raise "not yet"
   end
 
   def handle_info({:prompt, activity}, socket) when activity in [:active, :inactive] do
@@ -199,8 +200,8 @@ defmodule ExTerm do
       :ok ->
         {:noreply, socket}
 
-      {:ok, Console.update_msg(from: from, to: to, cursor: cursor, last_cell: last_cell)} ->
-        dispatch(:handle_update, [socket.assigns.console, from, to, cursor, last_cell], socket)
+      {:ok, update = %Update{}} ->
+        dispatch(:handle_update, [update], socket)
 
       {:ok, assigns} ->
         {:noreply, assign(socket, assigns)}

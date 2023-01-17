@@ -18,6 +18,8 @@ defmodule ExTerm.Console.Update do
 
   alias ExTerm.Console
 
+  use MatchSpec
+
   @typedoc """
   ### fields
 
@@ -171,6 +173,29 @@ defmodule ExTerm.Console.Update do
     end
 
     console
+  end
+
+  defmatchspecp get_ms(location) when is_location(location) do
+    tuple = {^location, _} -> tuple
+  end
+
+  defmatchspecp get_ms(range = {start, finish}) when is_range(range) do
+    tuple = {location, _} when location >= start and location <= finish -> tuple
+  end
+
+  defmatchspecp get_ms({start, :end}) do
+    tuple = {location, _} when location >= start -> tuple
+  end
+
+  def get(%{changes: changes}, console) do
+    consolidated_matchspec =
+      changes
+      |> Enum.map(&get_ms/1)
+      |> Enum.reduce(fn [{m, [this], b}], [{m, [prev], b}] ->
+        [{m, [{:orelse, this, prev}], b}]
+      end)
+
+    Console.select(console, consolidated_matchspec)
   end
 
   #############################################################################
