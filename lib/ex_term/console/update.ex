@@ -156,7 +156,12 @@ defmodule ExTerm.Console.Update do
       raise "error: attempt to flush a nonexistent console update"
     end
 
-    Console.update_with(console, update)
+    # be silent if no changes were made.
+    unless update === %__MODULE__{cursor: nil, changes: []} do
+      Console.update_with(console, update)
+    end
+    
+    console
   end
 
   #############################################################################

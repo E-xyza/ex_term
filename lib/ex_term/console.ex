@@ -109,7 +109,7 @@ defmodule ExTerm.Console do
 
   def new(opts \\ []) do
     permission = Keyword.get(opts, :permission, :protected)
-    {rows, columns} = layout = Keyword.get(opts, :layout, {24, 80})
+    layout = Keyword.get(opts, :layout, {24, 80})
     update_handler = Keyword.get(opts, :handle_update)
     table = :ets.new(__MODULE__, [permission, :ordered_set])
 
@@ -120,8 +120,7 @@ defmodule ExTerm.Console do
       end
 
     transaction(console, :mutate) do
-      console
-      |> put_metadata(
+      put_metadata(console,
         layout: layout,
         cursor: {1, 1},
         style: %Style{},
@@ -212,7 +211,7 @@ defmodule ExTerm.Console do
     {row, _} = last_cell(console)
     new_row = row + 1
     {_rows, columns} = layout(console)
-    Update.push_cells(console, {{row, 1}, {row, :end}})
+    Update.push_cells(console, {{new_row, 1}, {new_row, :end}})
 
     # note it's okay to put that last one out of order because ets will
     # order it correctly.
