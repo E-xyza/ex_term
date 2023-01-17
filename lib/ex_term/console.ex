@@ -22,6 +22,7 @@ defmodule ExTerm.Console do
 
   alias ExTerm.Console.Cell
   alias ExTerm.Console.StringTracker
+  alias ExTerm.Console.Update
   alias ExTerm.Style
 
   import ExTerm.Console.Helpers
@@ -59,6 +60,33 @@ defmodule ExTerm.Console do
   #############################################################################
   ## API
 
+  @spec new(keyword) :: t
+
+  # metadata access
+  @spec layout(t) :: location
+  @spec cursor(t) :: location
+  @spec style(t) :: Style.t()
+  @spec get_metadata(t, atom | [atom]) :: term
+
+  # metadata mutations
+  @spec put_metadata(t, atom, term) :: t
+  @spec put_metadata(t, keyword) :: t
+  @spec delete_metadata(t, atom) :: t
+
+  #@spec move_cursor(t, location) :: t
+
+  # cell access
+  @spec get(t, location) :: nil | Cell.t() | [Cell.t]
+
+  # primitive cell mutation
+  @spec put_cell(t, location, Cell.t()) :: t
+  @spec new_row(t, pos_integer() | :end) :: t
+
+  # complex cell mutation
+  @spec put_string(t, String.t()) :: t
+  @spec insert_string(t, String.t(), row :: pos_integer()) :: t
+  #@spec clear(t) :: t
+
   #############################################################################
   ## GUARDS
 
@@ -76,12 +104,9 @@ defmodule ExTerm.Console do
 
   defguard is_local(console) when node(custodian(console)) === node()
 
-  defp table(console), do: elem(console, 2)
-
   #############################################################################
   ## CONSOLE ETS interactions
 
-  @spec new(keyword) :: t
   def new(opts \\ []) do
     permission = Keyword.get(opts, :permission, :protected)
     {rows, columns} = layout = Keyword.get(opts, :layout, {24, 80})
@@ -105,17 +130,15 @@ defmodule ExTerm.Console do
     end
   end
 
-  @spec layout(t) :: location
+
   def layout(console) do
     get_metadata(console, :layout)
   end
 
-  @spec cursor(t) :: location
   def cursor(console) do
     get_metadata(console, :cursor)
   end
 
-  @spec style(t) :: Style.t()
   def style(console) do
     get_metadata(console, :style)
   end
@@ -126,7 +149,7 @@ defmodule ExTerm.Console do
     {{^key, ^value}, cell} -> cell
   end
 
-  @spec get(t, location) :: nil | Cell.t()
+
   def get(console, location) do
     console
     |> select(get_ms(location))
@@ -144,7 +167,6 @@ defmodule ExTerm.Console do
     tuple = {key, _} when key in keys -> tuple
   end
 
-  @spec get_metadata(t, atom | [atom]) :: term
   @doc """
   obtains a single key metadata or a list of keys.
 
@@ -160,30 +182,23 @@ defmodule ExTerm.Console do
 
   # basic mutations
 
-  @spec put_metadata(t, atom, term) :: t
   def put_metadata(console, key, value) do
     insert(console, [{key, value}])
   end
 
-  @spec put_metadata(t, keyword) :: t
   def put_metadata(console, keyword) do
     insert(console, keyword)
   end
 
-  @spec delete_metadata(t, atom) :: t
   def delete_metadata(console, key) do
     delete(console, key)
   end
 
-  @spec put_cell(t, location, Cell.t()) :: t
   def put_cell(console, location, char) do
-    last_cell = last_cell(console)
+    Update.push_cells(console, location)
 
     console
     |> insert({location, char})
-
-    raise "foo"
-    # |> update_with(location, location, last_cell)
   end
 
   # compound operations
@@ -191,67 +206,57 @@ defmodule ExTerm.Console do
     {{row, column}, cell} when row >= line -> {{row + 1, column}, cell}
   end
 
-  @spec new_row(t, pos_integer() | :end) :: t
   def new_row(console, insertion_at \\ :end)
 
   def new_row(console, :end) do
     {row, _} = last_cell(console)
     new_row = row + 1
     {_rows, columns} = layout(console)
+    Update.push_cells(console, {{row, 1}, {row, :end}})
 
     # note it's okay to put that last one out of order because ets will
     # order it correctly.
     console
     |> insert(make_blank_row(new_row, columns))
-
-    raise "foo"
-    # |> update_with({new_row, 1}, {new_row, columns + 1}, {new_row, columns})
   end
 
-  def new_row(console, line) when is_integer(line) do
-    new_row_columns = columns(console, line)
-    {last_row, last_column} = last_cell(console)
+  def new_row(console, row) when is_integer(row) do
+    Update.push_cells(console, {{row, 1}, :end})
 
-    moved_rows = select(console, bump_rows_after(line))
+    new_row_columns = columns(console, row)
+
+    moved_rows = select(console, bump_rows_after(row))
 
     update =
-      line
+      row
       |> make_blank_row(new_row_columns)
       |> Enum.reverse(moved_rows)
 
     console
     |> insert(update)
-
-    raise "foo"
-    # |> update_with({line, 1}, {last_row + 1, last_column}, {last_row + 1, last_column - 1})
   end
 
-  @spec put_string(t, String.t()) :: t
   def put_string(console, string) do
     console
     |> StringTracker.new()
     |> StringTracker.put_string_rows(string)
-    |> StringTracker.send_update(with_cursor: true)
     |> Map.get(:console)
   end
 
-  @spec insert_string(t, String.t(), row :: pos_integer()) :: t
   @doc """
   `inserts` a string at a certain row.
 
   This will "push down" as many lines as is necessary to insert the string.
   If the current cursor precedes the insertion point, it will be unaffected.
   If the current cursor is after the insertion point, it will be displaced
-  as many lines as makes sense.  ANSI "cursor" movements in the context of
-  this insertion are PINNED to the full lines of the inserted content.
+  as many lines as makes sense.
 
-  An ANSI "clear" operation only clears the region inserted so far.
+  TBD: what do "clear" and "ansi shift" commands do?
   """
   def insert_string(console, string, row) do
     console
     |> StringTracker.new(row)
     |> StringTracker.insert_string_rows(string)
-    |> StringTracker.send_update()
     |> Map.get(:console)
   end
 
@@ -286,20 +291,12 @@ defmodule ExTerm.Console do
 
   @spec move_cursor(t(), any) :: t()
   def move_cursor(console, new_cursor) do
-    old_cursor = cursor(console)
-    last_cell = last_cell(console)
-
     console
     |> put_metadata(:cursor, new_cursor)
-
-    raise "foo"
-
-    # |> update_with(old_cursor, old_cursor, new_cursor, last_cell)
-    # |> update_with(new_cursor, new_cursor, new_cursor, last_cell)
   end
 
   # functional utilities
-  @moduledoc false
+  @doc false
   # this is for internal use only.
   def update_with(console, update) do
     case get_metadata(console, :handle_update) do
@@ -440,4 +437,6 @@ defmodule ExTerm.Console do
         end
     ]
   end
+
+  defp table(console), do: elem(console, 2)
 end

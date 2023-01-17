@@ -156,43 +156,6 @@ defmodule ExTerm.Console.StringTracker do
     end
   end
 
-  @spec send_update(t, keyword) :: t
-  def send_update(
-        tracker = %{cursor: cursor, console: console, last_updated: last_updated},
-        opts \\ []
-      ) do
-    console
-    |> Console.put_metadata(:cursor, cursor)
-    |> Console.insert(tracker.updates)
-
-    last_updated =
-      case Keyword.get(opts, :with_cursor) do
-        true when cursor < last_updated -> last_updated
-        true -> cursor
-        _ -> last_updated
-      end
-
-    case Console.get_metadata(tracker.console, :handle_update) do
-      fun when is_function(fun, 1) ->
-        fun.(
-          Console.update_msg(
-            from: tracker.first_updated,
-            to: last_updated,
-            cursor: cursor,
-            last_cell: tracker.last_cell
-          )
-        )
-
-      nil ->
-        :ok
-
-      other ->
-        raise "invalid update handler, expected arity 1 fun, got #{inspect(other)}"
-    end
-
-    %{tracker | updates: []}
-  end
-
   defp pad_last_row(tracker = %{cursor: {_, cursor_column}}, columns) do
     {row, keys} =
       Enum.reduce(tracker.updates, {0, MapSet.new()}, fn
@@ -350,7 +313,6 @@ defmodule ExTerm.Console.StringTracker do
 
     tracker
     |> Map.put(:cursor, new_cursor)
-    |> send_update
     |> Map.merge(%{first_updated: new_cursor, last_updated: new_cursor})
   end
 
@@ -396,10 +358,7 @@ defmodule ExTerm.Console.StringTracker do
           {row, new_column}
       end
 
-    tracker
-    |> Map.put(:cursor, new_cursor)
-    |> send_update
-    |> Map.merge(%{first_updated: new_cursor, last_updated: new_cursor})
+    Map.merge(tracker, %{cursor: new_cursor, first_updated: new_cursor, last_updated: new_cursor})
   end
 
   # NOTE THE ORDER OF THE ARGUMENTS CAREFULLY

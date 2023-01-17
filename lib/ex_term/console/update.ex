@@ -8,7 +8,7 @@ defmodule ExTerm.Console.Update do
   are coming in.
   """
 
-  defstruct [:cursor, :last_cell, changes: []]
+  defstruct [:cursor, changes: []]
 
   @type row_end :: {pos_integer, :end}
   @type cell_range :: {Console.location(), Console.location() | row_end}
@@ -45,12 +45,11 @@ defmodule ExTerm.Console.Update do
 
   @type t :: %__MODULE__{
           cursor: nil | Console.location(),
-          last_cell: nil | Console.location(),
           changes: cell_changes
         }
 
   @doc false
-  def init() do
+  def init do
     if put_current_update(%__MODULE__{}) do
       raise "error: attempt to initialize console updates with an unflushed update"
     end
@@ -121,18 +120,30 @@ defmodule ExTerm.Console.Update do
 
   # for internal use only.
   defguardp is_any_range(item) when is_tuple(elem(item, 0))
+  defguardp row(location) when elem(location, 0)
+  defguardp col(location) when elem(location, 1)
 
   @doc false
+  @spec push_cells(Console.t, cell_change) :: :ok
   # note: this needs to be inside of a mutation transaction
-  def push_cells(console, location = {row, column}) do
+  def push_cells(console, location) do
     # check to see if the column is at the end of its row, in which case, amend
     # it to be a "row/end", for the purposes of compaction.
-    if Console.last_column?(console, location) do
-      push_cells(console, {{row, column}, {row, :end}})
+    if is_location(location) and Console.last_column?(console, location) do
+      push_cells(console, {location, {row(location), :end}})
     else
       update = get_current_update()
       put_current_update(%{update | changes: _push_change(update.changes, location)})
     end
+    :ok
+  end
+
+  @spec change_cursor(Console.location) :: :ok
+  def change_cursor(location) do
+    get_current_update()
+    |> Map.put(:cursor, location)
+    |> put_current_update()
+    :ok
   end
 
   @doc false
@@ -151,8 +162,6 @@ defmodule ExTerm.Console.Update do
   #############################################################################
   ## private helpers
 
-  defguardp row(location) when elem(location, 0)
-  defguardp col(location) when elem(location, 1)
   defguardp start(range) when elem(range, 0)
   defguardp finish(range) when elem(range, 1)
 

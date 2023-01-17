@@ -80,6 +80,17 @@ defmodule ExTerm.Console.Helpers do
 
     prongs = Enum.flat_map(prongs, & &1)
 
+    code = case type do
+      :access -> code
+      :mutate ->
+        quote do
+          alias ExTerm.Console.Update
+          Update.init()
+          unquote(code)
+          Update.flush(unquote(console))
+        end
+    end
+
     quote do
       alias ExTerm.Console.Helpers
 
