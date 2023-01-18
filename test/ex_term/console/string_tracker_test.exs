@@ -2,6 +2,7 @@ defmodule ExTermTest.Console.StringTrackerTest do
   use ExUnit.Case, async: true
 
   alias ExTerm.Console
+  alias ExTerm.Console.Cell
   alias ExTerm.Console.Helpers
   alias ExTerm.Console.StringTracker
 
@@ -13,7 +14,7 @@ defmodule ExTermTest.Console.StringTrackerTest do
   end
 
   describe "_blit_string_row/3" do
-    test "correctly does nothing when string is empty", %{console: console} do
+    test "does nothing when string is empty", %{console: console} do
       # put a first row in.
       Helpers.transaction console, :mutate do
         Console.new_row(console)
@@ -28,7 +29,7 @@ defmodule ExTermTest.Console.StringTrackerTest do
       end
     end
 
-    test "correctly records updates when it doesn't cross the line", %{console: console} do
+    test "records updates when it doesn't cross the line", %{console: console} do
       # put a first row in.
       Helpers.transaction console, :mutate do
         Console.new_row(console)
@@ -47,7 +48,7 @@ defmodule ExTermTest.Console.StringTrackerTest do
       end
     end
 
-    test "correctly doesn't try to make changes to the new line when at the end", %{console: console} do
+    test "doesn't try to make changes to the new line when at the end", %{console: console} do
       # put a first row in.
       Helpers.transaction console, :mutate do
         Console.new_row(console)
@@ -55,40 +56,89 @@ defmodule ExTermTest.Console.StringTrackerTest do
         tracker = StringTracker.new(console)
 
         assert {%{
-                 cursor: {2, 1},
-                 update: %{changes: [{{1, 1}, {1, :end}}]},
-                 cells: [
-                   {{1, 5}, %{char: "a"}},
-                   {{1, 4}, %{char: "b"}},
-                   {{1, 3}, %{char: "o"}},
-                   {{1, 2}, %{char: "o"}},
-                   {{1, 1}, %{char: "f"}}
-                 ]
-               }, ""} = StringTracker._blit_string_row(tracker, 5, "fooba")
+                  cursor: {2, 1},
+                  update: %{changes: [{{1, 1}, {1, :end}}]},
+                  cells: [
+                    {{1, 5}, %{char: "a"}},
+                    {{1, 4}, %{char: "b"}},
+                    {{1, 3}, %{char: "o"}},
+                    {{1, 2}, %{char: "o"}},
+                    {{1, 1}, %{char: "f"}}
+                  ]
+                }, ""} = StringTracker._blit_string_row(tracker, 5, "fooba")
 
         refute Console.get(console, {2, 1})
       end
     end
 
-    test "correctly releases leftover string", %{console: console} do
-      # put a first row in.
+    test "releases leftover string", %{console: console} do
       Helpers.transaction console, :mutate do
         Console.new_row(console)
 
         tracker = StringTracker.new(console)
 
         assert {%{
-                 cursor: {2, 1},
-                 update: %{changes: [{{1, 1}, {1, :end}}]},
-                 cells: [
-                   {{1, 5}, %{char: "a"}},
-                   {{1, 4}, %{char: "b"}},
-                   {{1, 3}, %{char: "o"}},
-                   {{1, 2}, %{char: "o"}},
-                   {{1, 1}, %{char: "f"}}
-                 ]
-               }, "r"} = StringTracker._blit_string_row(tracker, 5, "foobar")
+                  cursor: {2, 1},
+                  update: %{changes: [{{1, 1}, {1, :end}}]},
+                  cells: [
+                    {{1, 5}, %{char: "a"}},
+                    {{1, 4}, %{char: "b"}},
+                    {{1, 3}, %{char: "o"}},
+                    {{1, 2}, %{char: "o"}},
+                    {{1, 1}, %{char: "f"}}
+                  ]
+                }, "r"} = StringTracker._blit_string_row(tracker, 5, "foobar")
 
+        refute Console.get(console, {2, 1})
+      end
+    end
+
+    for char <- ["\n", "\r\n", "\r"] do
+      test "stops when you do a hard return with #{char}", %{console: console} do
+        Helpers.transaction console, :mutate do
+          Console.new_row(console)
+
+          tracker = StringTracker.new(console)
+
+          assert {%{
+                    cursor: {2, 1},
+                    update: %{changes: [{{1, 1}, {1, 3}}]},
+                    cells: [
+                      {{1, 3}, %{char: "o"}},
+                      {{1, 2}, %{char: "o"}},
+                      {{1, 1}, %{char: "f"}}
+                    ]
+                  }, "bar"} = StringTracker._blit_string_row(tracker, 5, "foo#{unquote(char)}bar")
+
+          refute Console.get(console, {2, 1})
+        end
+      end
+    end
+
+    test "will fill out a new line when it's beyond the end", %{console: console} do
+      Helpers.transaction console, :mutate do
+        tracker = StringTracker.new(console)
+
+        assert {%{
+                  cursor: {2, 1},
+                  update: %{changes: [{{1, 1}, :end}]},
+                  last_cell: {1, 5},
+                  cells: [
+                    {{1, 3}, %{char: "o"}},
+                    {{1, 2}, %{char: "o"}},
+                    {{1, 1}, %{char: "f"}}
+                  ]
+                }, "bar"} = StringTracker._blit_string_row(tracker, 5, "foo\nbar")
+
+        # NOTE that an empty line has been put into the console, but the console won't
+        # reflect the string that has been put into it, yet.  You must flush the console
+        # to get at those contents.
+
+        for index <- 1..5 do
+          assert %{char: nil} = Console.get(console, {1, index})
+        end
+
+        assert Cell.sentinel() === Console.get(console, {1, 6})
         refute Console.get(console, {2, 1})
       end
     end

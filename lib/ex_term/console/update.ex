@@ -133,7 +133,7 @@ defmodule ExTerm.Console.Update do
       register_cell_change(console, {cell_changes, {row(cell_changes), :end}})
     else
       get_current_update()
-      |> merge_changes(cell_changes)
+      |> merge_into(cell_changes)
       |> put_current_update()
     end
 
@@ -150,22 +150,33 @@ defmodule ExTerm.Console.Update do
   end
 
   @spec merge(t) :: :ok
+  @doc """
+  merges an update struct into the merge struct that is waiting in the
+  process dictionary
+  """
   def merge(new_update) do
     get_current_update()
     |> Map.update!(:cursor, fn old -> new_update.cursor || old end)
-    |> merge_changes(new_update.changes)
+    |> merge_into(new_update.changes)
     |> put_current_update()
 
     :ok
   end
 
-  @spec merge_changes(t, cell_change | cell_changes) :: t
-  def merge_changes(update, change) when is_tuple(change) do
+  @spec merge_into(t, cell_change | cell_changes) :: t
+  @doc """
+  To be used when tracking update changes in a custom fashion bypassing updates
+  separate from the process dictionary.
+
+  Should always be suceeded by `merge/2`, which will merge these separate updates
+  into the process dictionary
+  """
+  def merge_into(update, change) when is_tuple(change) do
     Map.update!(update, :changes, &_push_change(&1, change))
   end
 
-  def merge_changes(update, changes) when is_list(changes) do
-    Enum.reduce(changes, update, &merge_changes(&2, &1))
+  def merge_into(update, changes) when is_list(changes) do
+    Enum.reduce(changes, update, &merge_into(&2, &1))
   end
 
   @doc false

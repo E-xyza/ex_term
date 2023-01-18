@@ -80,10 +80,7 @@ defmodule ExTerm.Console.StringTracker do
       {updated_tracker, leftover} ->
         put_string_rows(updated_tracker, leftover)
 
-      done ->
-        done
-        |> pad_last_row(columns)
-        |> update_insert()
+      done -> done
     end
   end
 
@@ -98,16 +95,8 @@ defmodule ExTerm.Console.StringTracker do
       {new_tracker, leftover} ->
         insert_string_rows(new_tracker, leftover)
 
-      done = %{cells: [{{last_row, _}, _} | _]} ->
-        # figure out how many rows we need to move.  This is determined by the number
-        # of rows in the update.  Let's assume that it is the row of the first item.
-
-        move_distance = last_row - row + 1
-
-        done
-        |> pad_last_row(columns)
-        |> update_cursor(tracker.old_cursor, row, move_distance)
-        |> update_insert()
+      _done ->
+        raise "aaaaaagh"
     end
   end
 
@@ -119,10 +108,26 @@ defmodule ExTerm.Console.StringTracker do
     end
   end
 
+  # if we're trying to insert content on a row that doesn't exist yet, go
+  # ahead and put that row at the end of the console, but don't put this in
+  # the list of cells to update (this minimizes double-tap risk by ensuring
+  # that the act of creating the row is separated from the act of flushing
+  # data and we don't have to worry about the blank line overwriting later
+  # insertions with the same coordinate).
+  def _blit_string_row(tracker = %{cursor: {row, _column}, last_cell: {last_row, _}, layout: {_, layout_columns}}, _, string)
+    when row === last_row + 1 do
+    Console.insert(tracker.console, Console.make_blank_row(row, layout_columns))
+
+    tracker
+    |> Map.replace!(:last_cell, {row, layout_columns})
+    |> Map.update!(:update, &Update.merge_into(&1, {{row, 1}, :end}))
+    |> _blit_string_row(layout_columns, string)
+  end
+
   def _blit_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string)
       when column > columns do
     # make sure that the update reflects that this is the end line
-    new_update = Update.merge_changes(tracker.update, {cursor, {row, :end}})
+    new_update = Update.merge_into(tracker.update, {cursor, {row, :end}})
     {%{tracker | cursor: {row + 1, 1}, update: new_update}, string}
   end
 
@@ -157,29 +162,12 @@ defmodule ExTerm.Console.StringTracker do
 
       {grapheme, rest} ->
         new_cells = [{cursor, %Cell{char: grapheme, style: tracker.style}} | tracker.cells]
-        new_update = Update.merge_changes(tracker.update, cursor)
+        new_update = Update.merge_into(tracker.update, cursor)
 
         tracker
         |> Map.merge(%{cursor: {row, column + 1}, update: new_update, cells: new_cells})
         |> _blit_string_row(columns, rest)
     end
-  end
-
-  defp pad_last_row(tracker = %{cursor: {_, cursor_column}}, columns) do
-    {row, keys} =
-      Enum.reduce(tracker.cells, {0, MapSet.new()}, fn
-        {location = {this_row, _}, _}, {highest_row, keys} ->
-          new_highest_row = if this_row > highest_row, do: this_row, else: highest_row
-          {new_highest_row, MapSet.put(keys, location)}
-      end)
-
-    new_updates =
-      for column <- cursor_column..columns, {row, column} not in keys, reduce: tracker.cells do
-        cells -> [{{row, column}, %Cell{}} | cells]
-      end
-
-    # fill out the row.
-    %{tracker | cells: prepend_sentinel(new_updates, {row, columns + 1})}
   end
 
   defp update_cursor(tracker, old_cursor, insert_row, move_distance) do
@@ -191,7 +179,6 @@ defmodule ExTerm.Console.StringTracker do
         {row, column} ->
           {row + move_distance, column}
       end
-      |> dbg(limit: 25)
 
     %{tracker | cursor: new_cursor}
   end
@@ -204,27 +191,8 @@ defmodule ExTerm.Console.StringTracker do
 
   defguardp is_inserting(tracker) when tracker.insertion !== nil
 
-  # if we're beyond the last row of the console (or doing an insertion), go ahead and
-  # fill in the rest of the row.  In both cases, we can defer sending the update because
-  # we know that cells from here on are going to be continuous.
-  defp hard_return(
-         tracker = %{cursor: {row, column}, last_cell: {last_row, _}, layout: {_, columns}}
-       )
-       when row > last_row or is_inserting(tracker) do
-    cells =
-      column..columns
-      |> Enum.reduce(tracker.cells, &prepend_blank(&2, {row, &1}))
-      |> prepend_sentinel({row, columns + 1})
-
-    %{tracker | cursor: {row + 1, 1}, cells: cells, last_cell: {row + 1, columns}}
-  end
-
-  defp hard_return(tracker = %{cursor: {row, _column}}) do
-    new_cursor = {row + 1, 1}
-
-    tracker
-    |> Map.put(:cursor, new_cursor)
-    |> Map.merge(%{first_updated: new_cursor, last_updated: new_cursor})
+  defp hard_return(tracker = %{cursor: {row, _}}) do
+    %{tracker | cursor: {row + 1, 1}}
   end
 
   # if we're beyond the last row of the console (or doing an insertion), go
