@@ -125,24 +125,16 @@ defmodule ExTerm.Console.Update do
   defguardp row(location) when elem(location, 0)
   defguardp col(location) when elem(location, 1)
 
-  @doc false
-  @spec push_cells(Console.t(), cell_change | [cell_change]) :: Console.t()
-  # note: this needs to be inside of a mutation transaction
-  def push_cells(console, []), do: console
-
-  def push_cells(console, [head | rest]) do
-    push_cells(console, head)
-    push_cells(console, rest)
-  end
-
-  def push_cells(console, location) do
+  @spec register_cell_change(Console.t, cell_change | cell_changes) :: Console.t
+  def register_cell_change(console, cell_changes) do
     # check to see if the column is at the end of its row, in which case, amend
     # it to be a "row/end", for the purposes of compaction.
-    if is_location(location) and Console.last_column?(console, location) do
-      push_cells(console, {location, {row(location), :end}})
+    if is_location(cell_changes) and Console.last_column?(console, cell_changes) do
+      register_cell_change(console, {cell_changes, {row(cell_changes), :end}})
     else
-      update = get_current_update()
-      put_current_update(%{update | changes: _push_change(update.changes, location)})
+      get_current_update()
+      |> merge_changes(cell_changes)
+      |> put_current_update()
     end
 
     console
@@ -155,6 +147,25 @@ defmodule ExTerm.Console.Update do
     |> put_current_update()
 
     :ok
+  end
+
+  @spec merge(t) :: :ok
+  def merge(new_update) do
+    get_current_update()
+    |> Map.update!(:cursor, fn old -> new_update.cursor || old end)
+    |> merge_changes(new_update.changes)
+    |> put_current_update()
+
+    :ok
+  end
+
+  @spec merge_changes(t, cell_change | cell_changes) :: t
+  def merge_changes(update, change) when is_tuple(change) do
+    Map.update!(update, :changes, _push_change(update.changes, change))
+  end
+
+  def merge_changes(update, changes) when is_list(changes) do
+    Enum.reduce(changes, update, &merge_changes(&2, &1))
   end
 
   @doc false
@@ -282,6 +293,9 @@ defmodule ExTerm.Console.Update do
                      (finish(first) >= start(second) or
                         _location_precedes_location(finish(first), start(second))))
 
+  #############################################################################
+  ## private utilities
+
   @doc false
   @spec _push_change(cell_changes, cell_change, cell_changes) :: cell_changes
 
@@ -347,9 +361,6 @@ defmodule ExTerm.Console.Update do
   def _push_change([head | rest], change, ignored) do
     _push_change(rest, change, [head | ignored])
   end
-
-  #############################################################################
-  ## private utilities
 
   @update_process_key :exterm_console_updates
 

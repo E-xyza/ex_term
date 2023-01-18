@@ -188,7 +188,7 @@ defmodule ExTerm.Console do
   end
 
   def put_cell(console, location, char) do
-    Update.push_cells(console, location)
+    Update.register_cell_change(console, location)
 
     console
     |> insert({location, char})
@@ -204,7 +204,7 @@ defmodule ExTerm.Console do
     {row, _} = last_cell(console)
     new_row = row + 1
     {_rows, columns} = layout(console)
-    Update.push_cells(console, {{new_row, 1}, {new_row, :end}})
+    Update.register_cell_change(console, {{new_row, 1}, {new_row, :end}})
 
     insert(console, make_blank_row(new_row, columns))
   end
@@ -230,7 +230,7 @@ defmodule ExTerm.Console do
     end
 
     # register the update that we will need to do.
-    Update.push_cells(console, {{row, 1}, :end})
+    Update.register_cell_change(console, {{row, 1}, :end})
 
     rows_to_move =
       console
@@ -271,6 +271,7 @@ defmodule ExTerm.Console do
     console
     |> StringTracker.new()
     |> StringTracker.put_string_rows(string)
+    |> StringTracker.flush_updates
     |> Map.get(:console)
   end
 
@@ -285,9 +286,13 @@ defmodule ExTerm.Console do
   TBD: what do "clear" and "ansi shift" commands do?
   """
   def insert_string(console, string, row) do
+    # the claim here is that everything after a given location must be broadcast.
+    Update.register_cell_change(console, {{row, 1}, :end})
+
     console
     |> StringTracker.new(row)
     |> StringTracker.insert_string_rows(string)
+    |> StringTracker.flush_updates
     |> Map.get(:console)
   end
 
@@ -333,7 +338,7 @@ defmodule ExTerm.Console do
     Update.change_cursor(new_cursor)
 
     console
-    |> Update.push_cells(changes)
+    |> Update.register_cell_change(changes)
     |> put_metadata(:cursor, new_cursor)
   end
 

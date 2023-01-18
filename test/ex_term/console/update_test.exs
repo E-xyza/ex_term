@@ -11,7 +11,7 @@ defmodule ExTermTest.Console.UpdateTest do
       _location_precedes_range: 2,
       _range_precedes_location: 2,
       _range_precedes_range: 2,
-      _push_change: 2
+      __push_change: 2
     ]
 
   describe "the _is_in function" do
@@ -300,238 +300,238 @@ defmodule ExTermTest.Console.UpdateTest do
     end
   end
 
-  describe "the _push_change/2 function puts into an empty list" do
+  describe "the __push_change/2 function puts into an empty list" do
     test "a single tuple" do
-      assert [{1, 1}] === _push_change([], {1, 1})
+      assert [{1, 1}] === __push_change([], {1, 1})
     end
 
     test "a basic range" do
-      assert [{{1, 1}, {2, 2}}] === _push_change([], {{1, 1}, {2, 2}})
+      assert [{{1, 1}, {2, 2}}] === __push_change([], {{1, 1}, {2, 2}})
     end
 
     test "a range with a line end" do
-      assert [{{1, 1}, {2, :end}}] === _push_change([], {{1, 1}, {2, :end}})
+      assert [{{1, 1}, {2, :end}}] === __push_change([], {{1, 1}, {2, :end}})
     end
 
     test "an end range" do
-      assert [{{1, 1}, :end}] === _push_change([], {{1, 1}, :end})
+      assert [{{1, 1}, :end}] === __push_change([], {{1, 1}, :end})
     end
   end
 
-  describe "the _push_change/2 function puts with two locations" do
+  describe "the __push_change/2 function puts with two locations" do
     test "a disjoint lesser location is passed through" do
-      assert [{1, 3}, {1, 1}] === _push_change([{1, 3}], {1, 1})
+      assert [{1, 3}, {1, 1}] === __push_change([{1, 3}], {1, 1})
     end
 
     test "a preceding location is merged through" do
-      assert [{{1, 1}, {1, 2}}] === _push_change([{1, 2}], {1, 1})
+      assert [{{1, 1}, {1, 2}}] === __push_change([{1, 2}], {1, 1})
     end
 
     test "an identical location is merged through" do
-      assert [{1, 2}] === _push_change([{1, 2}], {1, 2})
+      assert [{1, 2}] === __push_change([{1, 2}], {1, 2})
     end
 
     test "a succeeding location is merged through" do
-      assert [{{1, 1}, {1, 2}}] === _push_change([{1, 1}], {1, 2})
+      assert [{{1, 1}, {1, 2}}] === __push_change([{1, 1}], {1, 2})
     end
 
     test "a disjoint greater location is passed through" do
-      assert [{1, 3}, {1, 1}] === _push_change([{1, 1}], {1, 3})
+      assert [{1, 3}, {1, 1}] === __push_change([{1, 1}], {1, 3})
     end
   end
 
-  describe "the _push_change/2 function puts with a location and a range" do
+  describe "the __push_change/2 function puts with a location and a range" do
     test "a disjoint lesser location is passed through" do
-      assert [{{1, 3}, {1, 4}}, {1, 1}] === _push_change([{{1, 3}, {1, 4}}], {1, 1})
+      assert [{{1, 3}, {1, 4}}, {1, 1}] === __push_change([{{1, 3}, {1, 4}}], {1, 1})
     end
 
     test "a preceding location is merged through" do
-      assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 2}, {1, 4}}], {1, 1})
-      assert [{{1, 1}, {1, :end}}] === _push_change([{{1, 2}, {1, :end}}], {1, 1})
-      assert [{{1, 1}, :end}] === _push_change([{{1, 2}, :end}], {1, 1})
+      assert [{{1, 1}, {1, 4}}] === __push_change([{{1, 2}, {1, 4}}], {1, 1})
+      assert [{{1, 1}, {1, :end}}] === __push_change([{{1, 2}, {1, :end}}], {1, 1})
+      assert [{{1, 1}, :end}] === __push_change([{{1, 2}, :end}], {1, 1})
     end
 
     test "an internal location is merged through" do
-      assert [{{1, 2}, {1, 4}}] === _push_change([{{1, 2}, {1, 4}}], {1, 2})
-      assert [{{1, 2}, {1, 4}}] === _push_change([{{1, 2}, {1, 4}}], {1, 3})
-      assert [{{1, 2}, {1, 4}}] === _push_change([{{1, 2}, {1, 4}}], {1, 4})
+      assert [{{1, 2}, {1, 4}}] === __push_change([{{1, 2}, {1, 4}}], {1, 2})
+      assert [{{1, 2}, {1, 4}}] === __push_change([{{1, 2}, {1, 4}}], {1, 3})
+      assert [{{1, 2}, {1, 4}}] === __push_change([{{1, 2}, {1, 4}}], {1, 4})
 
-      assert [{{1, 2}, {1, :end}}] === _push_change([{{1, 2}, {1, :end}}], {1, 2})
-      assert [{{1, 2}, {1, :end}}] === _push_change([{{1, 2}, {1, :end}}], {1, 3})
-      assert [{{1, 2}, {1, :end}}] === _push_change([{{1, 2}, {1, :end}}], {1, 4})
+      assert [{{1, 2}, {1, :end}}] === __push_change([{{1, 2}, {1, :end}}], {1, 2})
+      assert [{{1, 2}, {1, :end}}] === __push_change([{{1, 2}, {1, :end}}], {1, 3})
+      assert [{{1, 2}, {1, :end}}] === __push_change([{{1, 2}, {1, :end}}], {1, 4})
 
-      assert [{{1, 2}, :end}] === _push_change([{{1, 2}, :end}], {1, 2})
-      assert [{{1, 2}, :end}] === _push_change([{{1, 2}, :end}], {1, 3})
-      assert [{{1, 2}, :end}] === _push_change([{{1, 2}, :end}], {1, 4})
+      assert [{{1, 2}, :end}] === __push_change([{{1, 2}, :end}], {1, 2})
+      assert [{{1, 2}, :end}] === __push_change([{{1, 2}, :end}], {1, 3})
+      assert [{{1, 2}, :end}] === __push_change([{{1, 2}, :end}], {1, 4})
     end
 
     test "a succeeding location is merged through" do
-      assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 1}, {1, 3}}], {1, 4})
-      assert [{{1, 1}, {2, 1}}] === _push_change([{{1, 1}, {1, :end}}], {2, 1})
+      assert [{{1, 1}, {1, 4}}] === __push_change([{{1, 1}, {1, 3}}], {1, 4})
+      assert [{{1, 1}, {2, 1}}] === __push_change([{{1, 1}, {1, :end}}], {2, 1})
     end
 
     test "a disjoint greater location is passed through" do
-      assert [{1, 4}, {{1, 1}, {1, 2}}] === _push_change([{{1, 1}, {1, 2}}], {1, 4})
-      assert [{2, 2}, {{1, 1}, {1, :end}}] === _push_change([{{1, 1}, {1, :end}}], {2, 2})
+      assert [{1, 4}, {{1, 1}, {1, 2}}] === __push_change([{{1, 1}, {1, 2}}], {1, 4})
+      assert [{2, 2}, {{1, 1}, {1, :end}}] === __push_change([{{1, 1}, {1, :end}}], {2, 2})
     end
   end
 
-  describe "the _push_change/2 function puts with a range and a location" do
+  describe "the __push_change/2 function puts with a range and a location" do
     test "a disjoint lesser location is passed through" do
-      assert [{{1, 3}, {1, 4}}, {1, 1}] === _push_change([{1, 1}], {{1, 3}, {1, 4}})
-      assert [{{1, 3}, {1, :end}}, {1, 1}] === _push_change([{1, 1}], {{1, 3}, {1, :end}})
-      assert [{{1, 3}, :end}, {1, 1}] === _push_change([{1, 1}], {{1, 3}, :end})
+      assert [{{1, 3}, {1, 4}}, {1, 1}] === __push_change([{1, 1}], {{1, 3}, {1, 4}})
+      assert [{{1, 3}, {1, :end}}, {1, 1}] === __push_change([{1, 1}], {{1, 3}, {1, :end}})
+      assert [{{1, 3}, :end}, {1, 1}] === __push_change([{1, 1}], {{1, 3}, :end})
     end
 
     test "a preceding location is merged through" do
-      assert [{{1, 1}, {1, 4}}] === _push_change([{1, 1}], {{1, 2}, {1, 4}})
-      assert [{{1, 1}, {1, :end}}] === _push_change([{1, 1}], {{1, 2}, {1, :end}})
-      assert [{{1, 1}, :end}] === _push_change([{1, 1}], {{1, 2}, :end})
+      assert [{{1, 1}, {1, 4}}] === __push_change([{1, 1}], {{1, 2}, {1, 4}})
+      assert [{{1, 1}, {1, :end}}] === __push_change([{1, 1}], {{1, 2}, {1, :end}})
+      assert [{{1, 1}, :end}] === __push_change([{1, 1}], {{1, 2}, :end})
     end
 
     test "an internal location is merged through" do
-      assert [{{1, 2}, {1, 4}}] === _push_change([{1, 2}], {{1, 2}, {1, 4}})
-      assert [{{1, 2}, {1, 4}}] === _push_change([{1, 3}], {{1, 2}, {1, 4}})
-      assert [{{1, 2}, {1, 4}}] === _push_change([{1, 4}], {{1, 2}, {1, 4}})
+      assert [{{1, 2}, {1, 4}}] === __push_change([{1, 2}], {{1, 2}, {1, 4}})
+      assert [{{1, 2}, {1, 4}}] === __push_change([{1, 3}], {{1, 2}, {1, 4}})
+      assert [{{1, 2}, {1, 4}}] === __push_change([{1, 4}], {{1, 2}, {1, 4}})
 
-      assert [{{1, 2}, {1, :end}}] === _push_change([{1, 2}], {{1, 2}, {1, :end}})
-      assert [{{1, 2}, {1, :end}}] === _push_change([{1, 3}], {{1, 2}, {1, :end}})
+      assert [{{1, 2}, {1, :end}}] === __push_change([{1, 2}], {{1, 2}, {1, :end}})
+      assert [{{1, 2}, {1, :end}}] === __push_change([{1, 3}], {{1, 2}, {1, :end}})
 
-      assert [{{1, 2}, :end}] === _push_change([{1, 2}], {{1, 2}, :end})
-      assert [{{1, 2}, :end}] === _push_change([{1, 3}], {{1, 2}, :end})
+      assert [{{1, 2}, :end}] === __push_change([{1, 2}], {{1, 2}, :end})
+      assert [{{1, 2}, :end}] === __push_change([{1, 3}], {{1, 2}, :end})
     end
 
     test "a succeeding location is merged through" do
-      assert [{{1, 1}, {1, 4}}] === _push_change([{1, 4}], {{1, 1}, {1, 3}})
-      assert [{{1, 1}, {2, 1}}] === _push_change([{2, 1}], {{1, 1}, {1, :end}})
+      assert [{{1, 1}, {1, 4}}] === __push_change([{1, 4}], {{1, 1}, {1, 3}})
+      assert [{{1, 1}, {2, 1}}] === __push_change([{2, 1}], {{1, 1}, {1, :end}})
     end
 
     test "a disjoint greater location is passed through" do
-      assert [{1, 4}, {{1, 1}, {1, 2}}] === _push_change([{1, 4}], {{1, 1}, {1, 2}})
-      assert [{2, 2}, {{1, 1}, {1, :end}}] === _push_change([{2, 2}], {{1, 1}, {1, :end}})
+      assert [{1, 4}, {{1, 1}, {1, 2}}] === __push_change([{1, 4}], {{1, 1}, {1, 2}})
+      assert [{2, 2}, {{1, 1}, {1, :end}}] === __push_change([{2, 2}], {{1, 1}, {1, :end}})
     end
   end
 
-  describe "the _push_change/2 function puts with a range and a range" do
+  describe "the __push_change/2 function puts with a range and a range" do
     test "a disjoint lesser range is passed through" do
       assert [{{1, 4}, {1, 5}}, {{1, 1}, {1, 2}}] ===
-               _push_change([{{1, 4}, {1, 5}}], {{1, 1}, {1, 2}})
+               __push_change([{{1, 4}, {1, 5}}], {{1, 1}, {1, 2}})
 
       assert [{{1, 4}, {1, :end}}, {{1, 1}, {1, 2}}] ===
-               _push_change([{{1, 4}, {1, :end}}], {{1, 1}, {1, 2}})
+               __push_change([{{1, 4}, {1, :end}}], {{1, 1}, {1, 2}})
 
       assert [{{1, 4}, :end}, {{1, 1}, {1, 2}}] ===
-               _push_change([{{1, 4}, :end}], {{1, 1}, {1, 2}})
+               __push_change([{{1, 4}, :end}], {{1, 1}, {1, 2}})
     end
 
     test "a preceding range is merged through" do
-      assert [{{1, 1}, {1, 5}}] === _push_change([{{1, 4}, {1, 5}}], {{1, 1}, {1, 3}})
-      assert [{{1, 1}, {1, :end}}] === _push_change([{{1, 4}, {1, :end}}], {{1, 1}, {1, 3}})
-      assert [{{1, 1}, :end}] === _push_change([{{1, 4}, :end}], {{1, 1}, {1, 3}})
+      assert [{{1, 1}, {1, 5}}] === __push_change([{{1, 4}, {1, 5}}], {{1, 1}, {1, 3}})
+      assert [{{1, 1}, {1, :end}}] === __push_change([{{1, 4}, {1, :end}}], {{1, 1}, {1, 3}})
+      assert [{{1, 1}, :end}] === __push_change([{{1, 4}, :end}], {{1, 1}, {1, 3}})
     end
 
     test "an overlapping range is merged through" do
-      assert [{{1, 1}, {1, 6}}] === _push_change([{{1, 4}, {1, 6}}], {{1, 1}, {1, 4}})
-      assert [{{1, 1}, {1, 6}}] === _push_change([{{1, 4}, {1, 6}}], {{1, 1}, {1, 5}})
-      assert [{{1, 1}, {1, 6}}] === _push_change([{{1, 4}, {1, 6}}], {{1, 1}, {1, 6}})
+      assert [{{1, 1}, {1, 6}}] === __push_change([{{1, 4}, {1, 6}}], {{1, 1}, {1, 4}})
+      assert [{{1, 1}, {1, 6}}] === __push_change([{{1, 4}, {1, 6}}], {{1, 1}, {1, 5}})
+      assert [{{1, 1}, {1, 6}}] === __push_change([{{1, 4}, {1, 6}}], {{1, 1}, {1, 6}})
 
-      assert [{{1, 1}, {1, :end}}] === _push_change([{{1, 4}, {1, :end}}], {{1, 1}, {1, 4}})
-      assert [{{1, 1}, {1, :end}}] === _push_change([{{1, 4}, {1, :end}}], {{1, 1}, {1, 5}})
+      assert [{{1, 1}, {1, :end}}] === __push_change([{{1, 4}, {1, :end}}], {{1, 1}, {1, 4}})
+      assert [{{1, 1}, {1, :end}}] === __push_change([{{1, 4}, {1, :end}}], {{1, 1}, {1, 5}})
 
-      assert [{{1, 1}, :end}] === _push_change([{{1, 4}, :end}], {{1, 1}, {1, 4}})
-      assert [{{1, 1}, :end}] === _push_change([{{1, 4}, :end}], {{1, 1}, {1, 5}})
+      assert [{{1, 1}, :end}] === __push_change([{{1, 4}, :end}], {{1, 1}, {1, 4}})
+      assert [{{1, 1}, :end}] === __push_change([{{1, 4}, :end}], {{1, 1}, {1, 5}})
     end
 
     test "an identical range is merged through" do
-      assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 1}, {1, 4}}], {{1, 1}, {1, 4}})
-      assert [{{1, 1}, {1, :end}}] === _push_change([{{1, 1}, {1, :end}}], {{1, 1}, {1, :end}})
-      assert [{{1, 1}, :end}] === _push_change([{{1, 1}, :end}], {{1, 1}, :end})
+      assert [{{1, 1}, {1, 4}}] === __push_change([{{1, 1}, {1, 4}}], {{1, 1}, {1, 4}})
+      assert [{{1, 1}, {1, :end}}] === __push_change([{{1, 1}, {1, :end}}], {{1, 1}, {1, :end}})
+      assert [{{1, 1}, :end}] === __push_change([{{1, 1}, :end}], {{1, 1}, :end})
     end
 
     test "an internal range is merged through" do
-      assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 1}, {1, 4}}], {{1, 1}, {1, 2}})
-      assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 1}, {1, 4}}], {{1, 2}, {1, 3}})
-      assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 1}, {1, 4}}], {{1, 2}, {1, 4}})
+      assert [{{1, 1}, {1, 4}}] === __push_change([{{1, 1}, {1, 4}}], {{1, 1}, {1, 2}})
+      assert [{{1, 1}, {1, 4}}] === __push_change([{{1, 1}, {1, 4}}], {{1, 2}, {1, 3}})
+      assert [{{1, 1}, {1, 4}}] === __push_change([{{1, 1}, {1, 4}}], {{1, 2}, {1, 4}})
 
-      assert [{{1, 1}, {1, :end}}] === _push_change([{{1, 1}, {1, :end}}], {{1, 1}, {1, 2}})
-      assert [{{1, 1}, {1, :end}}] === _push_change([{{1, 1}, {1, :end}}], {{1, 2}, {1, 3}})
+      assert [{{1, 1}, {1, :end}}] === __push_change([{{1, 1}, {1, :end}}], {{1, 1}, {1, 2}})
+      assert [{{1, 1}, {1, :end}}] === __push_change([{{1, 1}, {1, :end}}], {{1, 2}, {1, 3}})
 
-      assert [{{1, 1}, :end}] === _push_change([{{1, 1}, :end}], {{1, 2}, {1, 3}})
-      assert [{{1, 1}, :end}] === _push_change([{{1, 1}, :end}], {{1, 1}, {1, 2}})
+      assert [{{1, 1}, :end}] === __push_change([{{1, 1}, :end}], {{1, 2}, {1, 3}})
+      assert [{{1, 1}, :end}] === __push_change([{{1, 1}, :end}], {{1, 1}, {1, 2}})
     end
 
     test "a surrounding range is merged through" do
-      assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 1}, {1, 2}}], {{1, 1}, {1, 4}})
-      assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 2}, {1, 3}}], {{1, 1}, {1, 4}})
-      assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 2}, {1, 4}}], {{1, 1}, {1, 4}})
+      assert [{{1, 1}, {1, 4}}] === __push_change([{{1, 1}, {1, 2}}], {{1, 1}, {1, 4}})
+      assert [{{1, 1}, {1, 4}}] === __push_change([{{1, 2}, {1, 3}}], {{1, 1}, {1, 4}})
+      assert [{{1, 1}, {1, 4}}] === __push_change([{{1, 2}, {1, 4}}], {{1, 1}, {1, 4}})
 
-      assert [{{1, 1}, {1, :end}}] === _push_change([{{1, 1}, {1, 2}}], {{1, 1}, {1, :end}})
-      assert [{{1, 1}, {1, :end}}] === _push_change([{{1, 2}, {1, 3}}], {{1, 1}, {1, :end}})
+      assert [{{1, 1}, {1, :end}}] === __push_change([{{1, 1}, {1, 2}}], {{1, 1}, {1, :end}})
+      assert [{{1, 1}, {1, :end}}] === __push_change([{{1, 2}, {1, 3}}], {{1, 1}, {1, :end}})
 
-      assert [{{1, 1}, :end}] === _push_change([{{1, 2}, {1, 3}}], {{1, 1}, :end})
-      assert [{{1, 1}, :end}] === _push_change([{{1, 1}, {1, 2}}], {{1, 1}, :end})
+      assert [{{1, 1}, :end}] === __push_change([{{1, 2}, {1, 3}}], {{1, 1}, :end})
+      assert [{{1, 1}, :end}] === __push_change([{{1, 1}, {1, 2}}], {{1, 1}, :end})
     end
   end
 
-  describe "the _push_change/2 function can merge succesive content" do
+  describe "the __push_change/2 function can merge succesive content" do
     test "location, location, location" do
-      assert [{{1, 1}, {1, 3}}] === _push_change([{1, 3}, {1, 1}], {1, 2})
+      assert [{{1, 1}, {1, 3}}] === __push_change([{1, 3}, {1, 1}], {1, 2})
     end
 
     test "location, location, range" do
-      assert [{{1, 1}, {1, 4}}] === _push_change([{{1, 3}, {1, 4}}, {1, 1}], {1, 2})
-      assert [{{1, 1}, {1, :end}}] === _push_change([{{1, 3}, {1, :end}}, {1, 1}], {1, 2})
+      assert [{{1, 1}, {1, 4}}] === __push_change([{{1, 3}, {1, 4}}, {1, 1}], {1, 2})
+      assert [{{1, 1}, {1, :end}}] === __push_change([{{1, 3}, {1, :end}}, {1, 1}], {1, 2})
     end
 
     test "location, range, location" do
-      assert [{{1, 1}, {1, 4}}] === _push_change([{1, 4}, {1, 1}], {{1, 2}, {1, 3}})
-      assert [{{1, 1}, {2, 1}}] === _push_change([{2, 1}, {1, 1}], {{1, 2}, {1, :end}})
+      assert [{{1, 1}, {1, 4}}] === __push_change([{1, 4}, {1, 1}], {{1, 2}, {1, 3}})
+      assert [{{1, 1}, {2, 1}}] === __push_change([{2, 1}, {1, 1}], {{1, 2}, {1, :end}})
     end
 
     test "location, range, range" do
-      assert [{{1, 1}, {1, 5}}] === _push_change([{{1, 4}, {1, 5}}, {1, 1}], {{1, 2}, {1, 3}})
-      assert [{{1, 1}, {2, 2}}] === _push_change([{{2, 1}, {2, 2}}, {1, 1}], {{1, 2}, {1, :end}})
+      assert [{{1, 1}, {1, 5}}] === __push_change([{{1, 4}, {1, 5}}, {1, 1}], {{1, 2}, {1, 3}})
+      assert [{{1, 1}, {2, 2}}] === __push_change([{{2, 1}, {2, 2}}, {1, 1}], {{1, 2}, {1, :end}})
 
       assert [{{1, 1}, {1, :end}}] ===
-               _push_change([{{1, 4}, {1, :end}}, {1, 1}], {{1, 2}, {1, 3}})
+               __push_change([{{1, 4}, {1, :end}}, {1, 1}], {{1, 2}, {1, 3}})
 
       assert [{{1, 1}, {2, :end}}] ===
-               _push_change([{{2, 1}, {2, :end}}, {1, 1}], {{1, 2}, {1, :end}})
+               __push_change([{{2, 1}, {2, :end}}, {1, 1}], {{1, 2}, {1, :end}})
     end
 
     test "range, location, location" do
-      assert [{{1, 1}, {1, 4}}] === _push_change([{1, 4}, {{1, 1}, {1, 2}}], {1, 3})
-      assert [{{1, 1}, {2, 2}}] === _push_change([{2, 2}, {{1, 1}, {1, :end}}], {2, 1})
+      assert [{{1, 1}, {1, 4}}] === __push_change([{1, 4}, {{1, 1}, {1, 2}}], {1, 3})
+      assert [{{1, 1}, {2, 2}}] === __push_change([{2, 2}, {{1, 1}, {1, :end}}], {2, 1})
     end
 
     test "range, location, range" do
-      assert [{{1, 1}, {1, 5}}] === _push_change([{{1, 4}, {1, 5}}, {{1, 1}, {1, 2}}], {1, 3})
-      assert [{{1, 1}, {2, 3}}] === _push_change([{{2, 2}, {2, 3}}, {{1, 1}, {1, :end}}], {2, 1})
+      assert [{{1, 1}, {1, 5}}] === __push_change([{{1, 4}, {1, 5}}, {{1, 1}, {1, 2}}], {1, 3})
+      assert [{{1, 1}, {2, 3}}] === __push_change([{{2, 2}, {2, 3}}, {{1, 1}, {1, :end}}], {2, 1})
 
       assert [{{1, 1}, {1, :end}}] ===
-               _push_change([{{1, 4}, {1, :end}}, {{1, 1}, {1, 2}}], {1, 3})
+               __push_change([{{1, 4}, {1, :end}}, {{1, 1}, {1, 2}}], {1, 3})
 
       assert [{{1, 1}, {2, :end}}] ===
-               _push_change([{{2, 2}, {2, :end}}, {{1, 1}, {1, :end}}], {2, 1})
+               __push_change([{{2, 2}, {2, :end}}, {{1, 1}, {1, :end}}], {2, 1})
     end
 
     test "range, range, location" do
-      assert [{{1, 1}, {1, 5}}] === _push_change([{1, 5}, {{1, 1}, {1, 2}}], {{1, 3}, {1, 4}})
-      assert [{{1, 1}, {2, 3}}] === _push_change([{2, 3}, {{1, 1}, {1, :end}}], {{2, 1}, {2, 2}})
-      assert [{{1, 1}, {2, 1}}] === _push_change([{2, 1}, {{1, 1}, {1, 2}}], {{1, 3}, {1, :end}})
+      assert [{{1, 1}, {1, 5}}] === __push_change([{1, 5}, {{1, 1}, {1, 2}}], {{1, 3}, {1, 4}})
+      assert [{{1, 1}, {2, 3}}] === __push_change([{2, 3}, {{1, 1}, {1, :end}}], {{2, 1}, {2, 2}})
+      assert [{{1, 1}, {2, 1}}] === __push_change([{2, 1}, {{1, 1}, {1, 2}}], {{1, 3}, {1, :end}})
 
       assert [{{1, 1}, {3, 1}}] ===
-               _push_change([{3, 1}, {{1, 1}, {1, :end}}], {{2, 1}, {2, :end}})
+               __push_change([{3, 1}, {{1, 1}, {1, :end}}], {{2, 1}, {2, :end}})
     end
 
     test "range, range, range" do
       assert [{{1, 1}, {1, 6}}] ===
-               _push_change([{{1, 5}, {1, 6}}, {{1, 1}, {1, 2}}], {{1, 3}, {1, 4}})
+               __push_change([{{1, 5}, {1, 6}}, {{1, 1}, {1, 2}}], {{1, 3}, {1, 4}})
     end
 
     test "ranges that eat locations" do
-      assert [{{1, 1}, {1, 9}}] === _push_change([{1, 5}, {1, 3}], {{1, 1}, {1, 9}})
-      assert [{{1, 1}, {1, :end}}] === _push_change([{1, 5}, {1, 3}], {{1, 1}, {1, :end}})
+      assert [{{1, 1}, {1, 9}}] === __push_change([{1, 5}, {1, 3}], {{1, 1}, {1, 9}})
+      assert [{{1, 1}, {1, :end}}] === __push_change([{1, 5}, {1, 3}], {{1, 1}, {1, :end}})
     end
   end
 end
