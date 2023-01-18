@@ -338,7 +338,7 @@ defmodule ExTerm.Console do
     Update.change_cursor(new_cursor)
 
     console
-    |> Update.register_cell_change(changes)
+    |> Update.augment_cell_change(changes)
     |> put_metadata(:cursor, new_cursor)
   end
 

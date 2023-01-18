@@ -125,7 +125,7 @@ defmodule ExTerm.Console.Update do
   defguardp row(location) when elem(location, 0)
   defguardp col(location) when elem(location, 1)
 
-  @spec register_cell_change(Console.t(), cell_change | cell_changes) :: Console.t()
+  @spec augment_cell_change(Console.t(), cell_change | cell_changes) :: Console.t()
   def register_cell_change(console, cell_changes) do
     # check to see if the column is at the end of its row, in which case, amend
     # it to be a "row/end", for the purposes of compaction.
@@ -172,7 +172,7 @@ defmodule ExTerm.Console.Update do
   into the process dictionary
   """
   def merge_into(update, change) when is_tuple(change) do
-    Map.update!(update, :changes, &register_cell_change(&1, change))
+    Map.update!(update, :changes, &augment_cell_change(&1, change))
   end
 
   def merge_into(update, changes) when is_list(changes) do
@@ -308,69 +308,69 @@ defmodule ExTerm.Console.Update do
   ## private utilities
 
   @doc false
-  @spec register_cell_change(cell_changes, cell_change, cell_changes) :: cell_changes
+  @spec augment_cell_change(cell_changes, cell_change, cell_changes) :: cell_changes
 
-  def register_cell_change(changes, new_change, ignored \\ [])
+  def augment_cell_change(changes, new_change, ignored \\ [])
 
   # NB this function is public so that it can be tested.
-  def register_cell_change([], change, ignored), do: Enum.reverse(ignored, [change])
+  def augment_cell_change([], change, ignored), do: Enum.reverse(ignored, [change])
 
-  def register_cell_change(list = [same | _], same, ignored), do: Enum.reverse(ignored, list)
+  def augment_cell_change(list = [same | _], same, ignored), do: Enum.reverse(ignored, list)
 
-  def register_cell_change(list = [head | _], change, ignored) when _is_disjoint_greater(change, head) do
+  def augment_cell_change(list = [head | _], change, ignored) when _is_disjoint_greater(change, head) do
     Enum.reverse(ignored, [change | list])
   end
 
-  def register_cell_change(list = [head | _], change, ignored) when _is_in(change, head) do
+  def augment_cell_change(list = [head | _], change, ignored) when _is_in(change, head) do
     Enum.reverse(ignored, list)
   end
 
-  def register_cell_change([head | rest], change, ignored) when _is_in(head, change) do
-    register_cell_change(rest, change, ignored)
+  def augment_cell_change([head | rest], change, ignored) when _is_in(head, change) do
+    augment_cell_change(rest, change, ignored)
   end
 
-  def register_cell_change([head | rest], change, ignored)
+  def augment_cell_change([head | rest], change, ignored)
       when _location_precedes_location(change, head) do
-    register_cell_change(rest, {change, head}, ignored)
+    augment_cell_change(rest, {change, head}, ignored)
   end
 
-  def register_cell_change([head | rest], change, ignored)
+  def augment_cell_change([head | rest], change, ignored)
       when _location_precedes_location(head, change) do
     Enum.reverse(ignored, [{head, change} | rest])
   end
 
-  def register_cell_change([head | rest], change, ignored)
+  def augment_cell_change([head | rest], change, ignored)
       when _location_precedes_range(change, head) do
-    register_cell_change(rest, {change, finish(head)}, ignored)
+    augment_cell_change(rest, {change, finish(head)}, ignored)
   end
 
-  def register_cell_change([head | rest], change, ignored)
+  def augment_cell_change([head | rest], change, ignored)
       when _location_precedes_range(head, change) do
     Enum.reverse(ignored, [{head, finish(change)} | rest])
   end
 
-  def register_cell_change([head | rest], change, ignored)
+  def augment_cell_change([head | rest], change, ignored)
       when _range_precedes_location(change, head) do
-    register_cell_change(rest, {start(change), head}, ignored)
+    augment_cell_change(rest, {start(change), head}, ignored)
   end
 
-  def register_cell_change([head | rest], change, ignored)
+  def augment_cell_change([head | rest], change, ignored)
       when _range_precedes_location(head, change) do
     Enum.reverse(ignored, [{start(head), change} | rest])
   end
 
-  def register_cell_change([head | rest], change, ignored)
+  def augment_cell_change([head | rest], change, ignored)
       when _range_precedes_range(change, head) do
-    register_cell_change(rest, {start(change), finish(head)}, ignored)
+    augment_cell_change(rest, {start(change), finish(head)}, ignored)
   end
 
-  def register_cell_change([head | rest], change, ignored)
+  def augment_cell_change([head | rest], change, ignored)
       when _range_precedes_range(head, change) do
     Enum.reverse(ignored, [{start(head), finish(change)} | rest])
   end
 
-  def register_cell_change([head | rest], change, ignored) do
-    register_cell_change(rest, change, [head | ignored])
+  def augment_cell_change([head | rest], change, ignored) do
+    augment_cell_change(rest, change, [head | ignored])
   end
 
   @update_process_key :exterm_console_updates
