@@ -232,15 +232,11 @@ defmodule ExTerm.Console do
     # register the update that we will need to do.
     Update.register_cell_change(console, {{row, 1}, :end})
 
-    rows_to_move =
-      console
-      |> select(rows_from(row))
-      |> Enum.group_by(&elem(location(&1), 0))
-      |> bump_rows
+    moved_rows = _bump_rows(console, row, 1)
 
     insertion =
       1..new_row_columns
-      |> Enum.reduce(rows_to_move, fn index, so_far ->
+      |> Enum.reduce(moved_rows, fn index, so_far ->
         [{{row, index}, %Cell{}} | so_far]
       end)
       |> List.insert_at(0, {{row, new_row_columns + 1}, Cell.sentinel()})
@@ -248,22 +244,31 @@ defmodule ExTerm.Console do
     insert(console, insertion)
   end
 
-  defp bump_rows(rows) do
-    Enum.flat_map(rows, fn
-      {row, list} when is_map_key(rows, row + 1) ->
+  @spec _bump_rows(t, pos_integer, pos_integer) :: [cellinfo]
+  @doc false
+  def _bump_rows(console, from_row, count) do
+    grouped_rows =
+      console
+      |> select(rows_from(from_row))
+      |> Enum.group_by(&elem(location(&1), 0))
+
+    Enum.flat_map(grouped_rows, fn
+      {row, list} when is_map_key(grouped_rows, row + count) ->
+        # when the row exists, then we have to conform to the length of the
+        # target row.  Truncate to that length.
         list
-        |> Enum.zip(rows[row + 1])
+        |> Enum.zip(grouped_rows[row + count])
         |> Enum.map(fn
           # sentinel for destination row
           {_, dest = {_, %{char: "\n"}}} -> dest
           # sentinel for source row
           {{_, %{char: "\n"}}, dest} -> dest
-          {{{row, col}, cell}, _} -> {{row + 1, col}, cell}
+          {{{row, col}, cell}, _} -> {{row + count, col}, cell}
         end)
 
-      {_, list} ->
+      {row, list} ->
         # last line gets copied over outright
-        Enum.map(list, fn {{row, col}, cell} -> {{row + 1, col}, cell} end)
+        Enum.map(list, fn {{row, col}, cell} -> {{row + count, col}, cell} end)
     end)
   end
 
@@ -272,7 +277,7 @@ defmodule ExTerm.Console do
     |> StringTracker.new()
     |> StringTracker.put_string_rows(string)
     |> StringTracker.flush_updates()
-    |> Map.get(:console)
+    |> Map.fetch!(:console)
   end
 
   @doc """
@@ -293,7 +298,7 @@ defmodule ExTerm.Console do
     |> StringTracker.new(row)
     |> StringTracker.insert_string_rows(string)
     |> StringTracker.flush_updates()
-    |> Map.get(:console)
+    |> Map.fetch!(:console)
   end
 
   defmatchspecp cell_range_ms(row, column_start, row, column_end) do
@@ -323,23 +328,27 @@ defmodule ExTerm.Console do
   def move_cursor(console, new_cursor = {row, column}) do
     old_cursor = cursor(console)
 
-    changes =
-      case {last_cell(console), has?(console, new_cursor)} do
-        {_, true} ->
-          [old_cursor, new_cursor]
+    if old_cursor === new_cursor do
+      console
+    else
+      changes =
+        case {last_cell(console), has?(console, new_cursor)} do
+          {_, true} ->
+            [old_cursor, new_cursor]
 
-        {{last_row, _}, false} when last_row + 1 === row and column === 1 ->
-          [old_cursor]
+          {{last_row, _}, false} when last_row + 1 === row and column === 1 ->
+            [old_cursor]
 
-        {last, false} ->
-          raise "cursor move exceeded the console buffer (#{move_msg(console, last, new_cursor)})"
-      end
+          {last, false} ->
+            raise "cursor move exceeded the console buffer (#{move_msg(console, last, new_cursor)})"
+        end
 
-    Update.change_cursor(new_cursor)
+      Update.change_cursor(new_cursor)
 
-    console
-    |> Update.augment_cell_change(changes)
-    |> put_metadata(:cursor, new_cursor)
+      console
+      |> Update.register_cell_change([new_cursor, old_cursor])
+      |> put_metadata(:cursor, new_cursor)
+    end
   end
 
   def move_msg(_, {last_row, _}, {cursor_row, _}) when cursor_row > last_row do

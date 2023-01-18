@@ -112,7 +112,7 @@ defmodule ExTerm.Console.StringTracker do
         insert_string_rows(new_tracker, leftover)
 
       done ->
-        done
+        hard_return(done, columns)
     end
   end
 
@@ -127,18 +127,44 @@ defmodule ExTerm.Console.StringTracker do
   @spec flush_updates(t) :: t
   # flush updates handles three cases depending on what the state of the string tracker
   # is.  If it's in string mode, then it immediately
-  defp flush_updates(tracker) do
+  def flush_updates(tracker = %{mode: {:insert, from_row, count}}) do
+    count = count - 1
+    # note that count has an extra because we do a hard return
+    # at the end of an insert in all cases.
+    update_cells =
+      tracker.console
+      |> Console._bump_rows(from_row, count)
+      |> Enum.reverse(tracker.cells)
+
+    new_cursor =
+      case old_cursor = tracker.old_cursor do
+        {row, _} when row < from_row ->
+          old_cursor
+
+        {row, column} ->
+          {row + count, column}
+      end
+
+    tracker.console
+    |> Console.insert(update_cells)
+    |> Console.move_cursor(new_cursor)
+
     tracker
   end
 
-  # if we're trying to insert content on a row that doesn't exist yet, go
-  # ahead and put that row at the end of the console, but don't put this in
-  # the list of cells to update (this minimizes double-tap risk by ensuring
-  # that the act of creating the row is separated from the act of flushing
-  # data and we don't have to worry about the blank line overwriting later
-  # insertions with the same coordinate).
+  # if we are in put mode and trying to insert content on a row that doesn't
+  # exist yet, go ahead and put that row at the end of the console, but don't
+  # put this in the list of cells to update (this minimizes double-tap risk by
+  # ensuring that the act of creating the row is separated from the act of
+  # flushing data and we don't have to worry about the blank line overwriting
+  # later insertions with the same coordinate).
   def _blit_string_row(
-        tracker = %{cursor: {row, _column}, last_cell: {last_row, _}, layout: {_, layout_columns}},
+        tracker = %{
+          cursor: {row, _column},
+          last_cell: {last_row, _},
+          layout: {_, layout_columns},
+          mode: :put
+        },
         _,
         string
       )
@@ -154,24 +180,28 @@ defmodule ExTerm.Console.StringTracker do
   def _blit_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string)
       when column > columns do
     # make sure that the update reflects that this is the end line
-    new_update = Update.merge_into(tracker.update, {cursor, {row, :end}})
-    {%{tracker | cursor: {row + 1, 1}, update: new_update}, string}
+    new_update =
+      tracker
+      |> Map.replace!(:update, Update.merge_into(tracker.update, {cursor, {row, :end}}))
+      |> hard_return(columns)
+
+    {new_update, string}
   end
 
   def _blit_string_row(tracker, columns, "\t" <> rest) do
     _blit_string_row(hard_tab(tracker), columns, rest)
   end
 
-  def _blit_string_row(tracker, _columns, "\r\n" <> rest) do
-    {hard_return(tracker), rest}
+  def _blit_string_row(tracker, columns, "\r\n" <> rest) do
+    {hard_return(tracker, columns), rest}
   end
 
-  def _blit_string_row(tracker, _columns, "\r" <> rest) do
-    {hard_return(tracker), rest}
+  def _blit_string_row(tracker, columns, "\r" <> rest) do
+    {hard_return(tracker, columns), rest}
   end
 
-  def _blit_string_row(tracker, _columns, "\n" <> rest) do
-    {hard_return(tracker), rest}
+  def _blit_string_row(tracker, columns, "\n" <> rest) do
+    {hard_return(tracker, columns), rest}
   end
 
   def _blit_string_row(tracker = %{cursor: cursor}, columns, string = "\e" <> _) do
@@ -203,14 +233,16 @@ defmodule ExTerm.Console.StringTracker do
     %{tracker | cursor: new_cursor, update: %{tracker.update | cursor: new_cursor}}
   end
 
-  defp hard_return(tracker = %{cursor: {row, _}}) do
-    new_mode =
-      case tracker.mode do
-        {:insert, start, rows} -> {:insert, start, rows + 1}
-        mode -> mode
-      end
+  defp hard_return(tracker = %{cursor: {row, column}, mode: {:insert, start, rows}}, columns) do
+    new_mode = {:insert, start, rows + 1}
 
-    %{tracker | cursor: {row + 1, 1}, mode: new_mode}
+    new_cells = Enum.reduce(column..columns, tracker.cells, &[{{row, &1}, %Cell{}} | &2])
+
+    %{tracker | cursor: {row + 1, 1}, mode: new_mode, cells: new_cells}
+  end
+
+  defp hard_return(tracker = %{cursor: {row, _}}, _) do
+    %{tracker | cursor: {row + 1, 1}}
   end
 
   defp tab_destination(column, tab_length) do

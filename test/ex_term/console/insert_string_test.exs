@@ -21,9 +21,11 @@ defmodule ExTermTest.Console.InsertStringTest do
     test "works when the string is contained in the row", %{console: console} do
       # note that the cursor starts at {1, 1}
       Helpers.transaction console, :mutate do
-        Console.new_row(console)
-        Console.put_cell(console, {1, 5}, %Cell{char: "a"})
-        assert {1, 5} === Console.last_cell(console)
+        assert {1, 5} ===
+                 console
+                 |> Console.new_row()
+                 |> Console.put_cell({1, 5}, %Cell{char: "a"})
+                 |> Console.last_cell()
       end
 
       assert_receive %Update{changes: [{{1, 1}, {1, :end}}]}
@@ -32,7 +34,7 @@ defmodule ExTermTest.Console.InsertStringTest do
         Console.insert_string(console, "foo", 1)
       end
 
-      assert_receive %Update{changes: [{{1, 1}, :end}]}
+      assert_receive %Update{changes: [{{1, 1}, :end}], cursor: {2, 1}}
 
       Helpers.transaction console, :access do
         assert %{char: "f"} = Console.get(console, {1, 1})
@@ -46,67 +48,66 @@ defmodule ExTermTest.Console.InsertStringTest do
       end
     end
 
-    # test "moves the cursor downward if it was after the segment", %{console: console} do
-    #   # note that the cursor starts at {1, 1}
-    #   Helpers.transaction console, :mutate do
-    #     assert {5, 2} =
-    #              console
-    #              |> Console.put_cell({5, 5}, %Cell{char: "a"})
-    #              |> Console.move_cursor({5, 2})
-    #              |> Console.get_metadata(:cursor)
+    test "keeps the cursor the same if it was before", %{console: console} do
+      # note that the cursor starts at {1, 1}
+      Helpers.transaction console, :mutate do
+        assert {2, 5} ===
+                 console
+                 |> Console.new_row()
+                 |> Console.new_row()
+                 |> Console.put_cell({2, 5}, %Cell{char: "a"})
+                 |> Console.last_cell()
+      end
 
-    #     # inserts a string on line 5
-    #     Console.insert_string(console, "foo", 5)
+      assert_receive %Update{changes: [{{1, 1}, {2, :end}}]}
 
-    #     assert_receive Console.update_msg(
-    #                      from: {5, 1},
-    #                      to: {6, 6},
-    #                      cursor: {6, 2},
-    #                      last_cell: {6, 5}
-    #                    )
+      Helpers.transaction console, :mutate do
+        Console.insert_string(console, "foo", 2)
+      end
 
-    #     assert %{char: "f"} = Console.get(console, {5, 1})
-    #     assert %{char: "o"} = Console.get(console, {5, 2})
-    #     assert %{char: "o"} = Console.get(console, {5, 3})
-    #     assert %{char: nil} = Console.get(console, {5, 4})
-    #     assert %{char: nil} = Console.get(console, {5, 5})
-    #     assert %{char: "a"} = Console.get(console, {6, 5})
+      assert_receive %Update{changes: [{{2, 1}, :end}], cursor: nil}
 
-    #     assert {6, 2} = Console.cursor(console)
-    #   end
-    # end
+      Helpers.transaction console, :access do
+        assert %{char: "f"} = Console.get(console, {2, 1})
+        assert %{char: "o"} = Console.get(console, {2, 2})
+        assert %{char: "o"} = Console.get(console, {2, 3})
+        assert %{char: nil} = Console.get(console, {2, 4})
+        assert %{char: nil} = Console.get(console, {2, 5})
+        assert %{char: "a"} = Console.get(console, {3, 5})
 
-    # test "works when you insert more than one row", %{console: console} do
-    #   # note that the cursor starts at {1, 1}
-    #   Helpers.transaction console, :mutate do
-    #     Console.put_cell(console, {5, 5}, %Cell{char: "a"})
+        assert {1, 1} = Console.cursor(console)
+      end
+    end
 
-    #     Console.cursor(console)
+    test "works when more than one row is inserted", %{console: console} do
+      # note that the cursor starts at {1, 1}
+      Helpers.transaction console, :mutate do
+        assert {1, 5} ===
+                 console
+                 |> Console.new_row()
+                 |> Console.put_cell({1, 5}, %Cell{char: "a"})
+                 |> Console.last_cell()
+      end
 
-    #     # inserts a string on line 5
-    #     Console.insert_string(console, "foobar", 5)
+      assert_receive %Update{changes: [{{1, 1}, {1, :end}}]}
 
-    #     assert_receive Console.update_msg(
-    #                      from: {5, 1},
-    #                      to: {7, 6},
-    #                      cursor: {1, 1},
-    #                      last_cell: {7, 5}
-    #                    )
+      Helpers.transaction console, :mutate do
+        Console.insert_string(console, "foobar", 1)
+      end
 
-    #     assert %{char: "f"} = Console.get(console, {5, 1})
-    #     assert %{char: "o"} = Console.get(console, {5, 2})
-    #     assert %{char: "o"} = Console.get(console, {5, 3})
-    #     assert %{char: "b"} = Console.get(console, {5, 4})
-    #     assert %{char: "a"} = Console.get(console, {5, 5})
-    #     assert %{char: "\n"} = Console.get(console, {5, 6})
-    #     assert %{char: "r"} = Console.get(console, {6, 1})
-    #     assert %{char: nil} = Console.get(console, {6, 2})
-    #     assert %{char: nil} = Console.get(console, {6, 3})
-    #     assert %{char: nil} = Console.get(console, {6, 4})
-    #     assert %{char: nil} = Console.get(console, {6, 5})
-    #     assert %{char: "\n"} = Console.get(console, {6, 6})
-    #     assert %{char: "a"} = Console.get(console, {7, 5})
-    #   end
-    # end
+      # assert_receive %Update{changes: [{{1, 1}, :end}], cursor: {3, 1}}
+
+      Helpers.transaction console, :access do
+        assert %{char: "f"} = Console.get(console, {1, 1})
+        assert %{char: "o"} = Console.get(console, {1, 2})
+        assert %{char: "o"} = Console.get(console, {1, 3})
+        assert %{char: "b"} = Console.get(console, {1, 4})
+        assert %{char: "a"} = Console.get(console, {1, 5})
+        assert %{char: "r"} = Console.get(console, {2, 1})
+        assert %{char: "a"} = Console.get(console, {3, 5})
+
+        assert {3, 1} = Console.cursor(console)
+      end
+    end
   end
 end
