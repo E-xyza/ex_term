@@ -271,7 +271,7 @@ defmodule ExTerm.Console do
     console
     |> StringTracker.new()
     |> StringTracker.put_string_rows(string)
-    |> StringTracker.flush_updates
+    |> StringTracker.flush_updates()
     |> Map.get(:console)
   end
 
@@ -292,7 +292,7 @@ defmodule ExTerm.Console do
     console
     |> StringTracker.new(row)
     |> StringTracker.insert_string_rows(string)
-    |> StringTracker.flush_updates
+    |> StringTracker.flush_updates()
     |> Map.get(:console)
   end
 

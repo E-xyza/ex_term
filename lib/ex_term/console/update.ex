@@ -125,7 +125,7 @@ defmodule ExTerm.Console.Update do
   defguardp row(location) when elem(location, 0)
   defguardp col(location) when elem(location, 1)
 
-  @spec register_cell_change(Console.t, cell_change | cell_changes) :: Console.t
+  @spec register_cell_change(Console.t(), cell_change | cell_changes) :: Console.t()
   def register_cell_change(console, cell_changes) do
     # check to see if the column is at the end of its row, in which case, amend
     # it to be a "row/end", for the purposes of compaction.
@@ -161,7 +161,7 @@ defmodule ExTerm.Console.Update do
 
   @spec merge_changes(t, cell_change | cell_changes) :: t
   def merge_changes(update, change) when is_tuple(change) do
-    Map.update!(update, :changes, _push_change(update.changes, change))
+    Map.update!(update, :changes, &_push_change(&1, change))
   end
 
   def merge_changes(update, changes) when is_list(changes) do
