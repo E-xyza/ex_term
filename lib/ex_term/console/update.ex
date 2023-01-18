@@ -317,7 +317,8 @@ defmodule ExTerm.Console.Update do
 
   def augment_cell_change(list = [same | _], same, ignored), do: Enum.reverse(ignored, list)
 
-  def augment_cell_change(list = [head | _], change, ignored) when _is_disjoint_greater(change, head) do
+  def augment_cell_change(list = [head | _], change, ignored)
+      when _is_disjoint_greater(change, head) do
     Enum.reverse(ignored, [change | list])
   end
 

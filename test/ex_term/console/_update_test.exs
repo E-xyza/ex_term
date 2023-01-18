@@ -426,7 +426,10 @@ defmodule ExTermTest.Console.UpdateTest do
 
     test "a preceding range is merged through" do
       assert [{{1, 1}, {1, 5}}] === augment_cell_change([{{1, 4}, {1, 5}}], {{1, 1}, {1, 3}})
-      assert [{{1, 1}, {1, :end}}] === augment_cell_change([{{1, 4}, {1, :end}}], {{1, 1}, {1, 3}})
+
+      assert [{{1, 1}, {1, :end}}] ===
+               augment_cell_change([{{1, 4}, {1, :end}}], {{1, 1}, {1, 3}})
+
       assert [{{1, 1}, :end}] === augment_cell_change([{{1, 4}, :end}], {{1, 1}, {1, 3}})
     end
 
@@ -435,8 +438,11 @@ defmodule ExTermTest.Console.UpdateTest do
       assert [{{1, 1}, {1, 6}}] === augment_cell_change([{{1, 4}, {1, 6}}], {{1, 1}, {1, 5}})
       assert [{{1, 1}, {1, 6}}] === augment_cell_change([{{1, 4}, {1, 6}}], {{1, 1}, {1, 6}})
 
-      assert [{{1, 1}, {1, :end}}] === augment_cell_change([{{1, 4}, {1, :end}}], {{1, 1}, {1, 4}})
-      assert [{{1, 1}, {1, :end}}] === augment_cell_change([{{1, 4}, {1, :end}}], {{1, 1}, {1, 5}})
+      assert [{{1, 1}, {1, :end}}] ===
+               augment_cell_change([{{1, 4}, {1, :end}}], {{1, 1}, {1, 4}})
+
+      assert [{{1, 1}, {1, :end}}] ===
+               augment_cell_change([{{1, 4}, {1, :end}}], {{1, 1}, {1, 5}})
 
       assert [{{1, 1}, :end}] === augment_cell_change([{{1, 4}, :end}], {{1, 1}, {1, 4}})
       assert [{{1, 1}, :end}] === augment_cell_change([{{1, 4}, :end}], {{1, 1}, {1, 5}})
@@ -444,7 +450,10 @@ defmodule ExTermTest.Console.UpdateTest do
 
     test "an identical range is merged through" do
       assert [{{1, 1}, {1, 4}}] === augment_cell_change([{{1, 1}, {1, 4}}], {{1, 1}, {1, 4}})
-      assert [{{1, 1}, {1, :end}}] === augment_cell_change([{{1, 1}, {1, :end}}], {{1, 1}, {1, :end}})
+
+      assert [{{1, 1}, {1, :end}}] ===
+               augment_cell_change([{{1, 1}, {1, :end}}], {{1, 1}, {1, :end}})
+
       assert [{{1, 1}, :end}] === augment_cell_change([{{1, 1}, :end}], {{1, 1}, :end})
     end
 
@@ -453,8 +462,11 @@ defmodule ExTermTest.Console.UpdateTest do
       assert [{{1, 1}, {1, 4}}] === augment_cell_change([{{1, 1}, {1, 4}}], {{1, 2}, {1, 3}})
       assert [{{1, 1}, {1, 4}}] === augment_cell_change([{{1, 1}, {1, 4}}], {{1, 2}, {1, 4}})
 
-      assert [{{1, 1}, {1, :end}}] === augment_cell_change([{{1, 1}, {1, :end}}], {{1, 1}, {1, 2}})
-      assert [{{1, 1}, {1, :end}}] === augment_cell_change([{{1, 1}, {1, :end}}], {{1, 2}, {1, 3}})
+      assert [{{1, 1}, {1, :end}}] ===
+               augment_cell_change([{{1, 1}, {1, :end}}], {{1, 1}, {1, 2}})
+
+      assert [{{1, 1}, {1, :end}}] ===
+               augment_cell_change([{{1, 1}, {1, :end}}], {{1, 2}, {1, 3}})
 
       assert [{{1, 1}, :end}] === augment_cell_change([{{1, 1}, :end}], {{1, 2}, {1, 3}})
       assert [{{1, 1}, :end}] === augment_cell_change([{{1, 1}, :end}], {{1, 1}, {1, 2}})
@@ -465,8 +477,11 @@ defmodule ExTermTest.Console.UpdateTest do
       assert [{{1, 1}, {1, 4}}] === augment_cell_change([{{1, 2}, {1, 3}}], {{1, 1}, {1, 4}})
       assert [{{1, 1}, {1, 4}}] === augment_cell_change([{{1, 2}, {1, 4}}], {{1, 1}, {1, 4}})
 
-      assert [{{1, 1}, {1, :end}}] === augment_cell_change([{{1, 1}, {1, 2}}], {{1, 1}, {1, :end}})
-      assert [{{1, 1}, {1, :end}}] === augment_cell_change([{{1, 2}, {1, 3}}], {{1, 1}, {1, :end}})
+      assert [{{1, 1}, {1, :end}}] ===
+               augment_cell_change([{{1, 1}, {1, 2}}], {{1, 1}, {1, :end}})
+
+      assert [{{1, 1}, {1, :end}}] ===
+               augment_cell_change([{{1, 2}, {1, 3}}], {{1, 1}, {1, :end}})
 
       assert [{{1, 1}, :end}] === augment_cell_change([{{1, 2}, {1, 3}}], {{1, 1}, :end})
       assert [{{1, 1}, :end}] === augment_cell_change([{{1, 1}, {1, 2}}], {{1, 1}, :end})
@@ -489,8 +504,11 @@ defmodule ExTermTest.Console.UpdateTest do
     end
 
     test "location, range, range" do
-      assert [{{1, 1}, {1, 5}}] === augment_cell_change([{{1, 4}, {1, 5}}, {1, 1}], {{1, 2}, {1, 3}})
-      assert [{{1, 1}, {2, 2}}] === augment_cell_change([{{2, 1}, {2, 2}}, {1, 1}], {{1, 2}, {1, :end}})
+      assert [{{1, 1}, {1, 5}}] ===
+               augment_cell_change([{{1, 4}, {1, 5}}, {1, 1}], {{1, 2}, {1, 3}})
+
+      assert [{{1, 1}, {2, 2}}] ===
+               augment_cell_change([{{2, 1}, {2, 2}}, {1, 1}], {{1, 2}, {1, :end}})
 
       assert [{{1, 1}, {1, :end}}] ===
                augment_cell_change([{{1, 4}, {1, :end}}, {1, 1}], {{1, 2}, {1, 3}})
@@ -505,8 +523,11 @@ defmodule ExTermTest.Console.UpdateTest do
     end
 
     test "range, location, range" do
-      assert [{{1, 1}, {1, 5}}] === augment_cell_change([{{1, 4}, {1, 5}}, {{1, 1}, {1, 2}}], {1, 3})
-      assert [{{1, 1}, {2, 3}}] === augment_cell_change([{{2, 2}, {2, 3}}, {{1, 1}, {1, :end}}], {2, 1})
+      assert [{{1, 1}, {1, 5}}] ===
+               augment_cell_change([{{1, 4}, {1, 5}}, {{1, 1}, {1, 2}}], {1, 3})
+
+      assert [{{1, 1}, {2, 3}}] ===
+               augment_cell_change([{{2, 2}, {2, 3}}, {{1, 1}, {1, :end}}], {2, 1})
 
       assert [{{1, 1}, {1, :end}}] ===
                augment_cell_change([{{1, 4}, {1, :end}}, {{1, 1}, {1, 2}}], {1, 3})
@@ -516,9 +537,14 @@ defmodule ExTermTest.Console.UpdateTest do
     end
 
     test "range, range, location" do
-      assert [{{1, 1}, {1, 5}}] === augment_cell_change([{1, 5}, {{1, 1}, {1, 2}}], {{1, 3}, {1, 4}})
-      assert [{{1, 1}, {2, 3}}] === augment_cell_change([{2, 3}, {{1, 1}, {1, :end}}], {{2, 1}, {2, 2}})
-      assert [{{1, 1}, {2, 1}}] === augment_cell_change([{2, 1}, {{1, 1}, {1, 2}}], {{1, 3}, {1, :end}})
+      assert [{{1, 1}, {1, 5}}] ===
+               augment_cell_change([{1, 5}, {{1, 1}, {1, 2}}], {{1, 3}, {1, 4}})
+
+      assert [{{1, 1}, {2, 3}}] ===
+               augment_cell_change([{2, 3}, {{1, 1}, {1, :end}}], {{2, 1}, {2, 2}})
+
+      assert [{{1, 1}, {2, 1}}] ===
+               augment_cell_change([{2, 1}, {{1, 1}, {1, 2}}], {{1, 3}, {1, :end}})
 
       assert [{{1, 1}, {3, 1}}] ===
                augment_cell_change([{3, 1}, {{1, 1}, {1, :end}}], {{2, 1}, {2, :end}})

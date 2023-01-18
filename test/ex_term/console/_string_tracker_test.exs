@@ -142,5 +142,76 @@ defmodule ExTermTest.Console.StringTrackerTest do
         refute Console.get(console, {2, 1})
       end
     end
+
+    test "will hard tab from a full stop line", %{console: console} do
+      Helpers.transaction console, :mutate do
+        tracker =
+          console
+          |> Console.put_metadata(:layout, {20, 20})
+          |> Console.new_row
+          |> StringTracker.new()
+
+        assert %{
+                  cursor: {1, 10},
+                  update: %{cursor: {1, 10}, changes: []},
+                  last_cell: {1, 20},
+                  cells: []
+                } = StringTracker._blit_string_row(tracker, 20, "\t")
+
+        # note that tab has triggered filling out the new row.
+
+        for index <- 1..20 do
+          assert %{char: nil} = Console.get(console, {1, index})
+        end
+        assert Cell.sentinel() == Console.get(console, {1, 21})
+      end
+    end
+
+    test "will hard tab after adding a character", %{console: console} do
+      Helpers.transaction console, :mutate do
+        tracker =
+          console
+          |> Console.put_metadata(:layout, {20, 20})
+          |> Console.new_row
+          |> StringTracker.new()
+
+        assert %{
+                  cursor: {1, 10},
+                  update: %{cursor: {1, 10}, changes: [{1, 1}]},
+                  last_cell: {1, 20},
+                  cells: [{{1, 1}, %{char: "a"}}]
+                } = StringTracker._blit_string_row(tracker, 20, "a\t")
+
+        # note that tab has triggered filling out the new row.
+
+        for index <- 1..20 do
+          assert %{char: nil} = Console.get(console, {1, index})
+        end
+        assert Cell.sentinel() == Console.get(console, {1, 21})
+      end
+    end
+
+    test "will hard tab from a full stop on an empty line", %{console: console} do
+      Helpers.transaction console, :mutate do
+        tracker =
+          console
+          |> Console.put_metadata(:layout, {20, 20})
+          |> StringTracker.new()
+
+        assert %{
+                  cursor: {1, 10},
+                  update: %{cursor: {1, 10}, changes: [{{1, 1}, :end}]},
+                  last_cell: {1, 20},
+                  cells: []
+                } = StringTracker._blit_string_row(tracker, 20, "\t")
+
+        # note that tab has triggered filling out the new row.
+
+        for index <- 1..20 do
+          assert %{char: nil} = Console.get(console, {1, index})
+        end
+        assert Cell.sentinel() == Console.get(console, {1, 21})
+      end
+    end
   end
 end
