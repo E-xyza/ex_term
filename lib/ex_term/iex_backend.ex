@@ -95,18 +95,17 @@ defmodule ExTerm.IexBackend do
   def handle_blur(_), do: {:ok, focus: false}
 
   ## ROUTER: HANDLE_IO
-  def handle_io_request(from, {:put_chars, :unicode, string}, state = %{console: console}) do
+  def handle_io_request(from, {:put_chars, :unicode, iodata}, state = %{console: console}) do
     if prompt = state.prompt do
       Helpers.transaction console, :mutate do
         {row, _} = prompt.location
-        Console.insert_string(console, string, row)
+        Console.insert_iodata(console, iodata, row)
       end
     else
       Helpers.transaction console, :mutate do
-        Console.put_string(console, string)
+        Console.put_iodata(console, iodata)
       end
     end
-
     ExTerm.io_reply(from)
     {:noreply, state}
   end
@@ -114,7 +113,7 @@ defmodule ExTerm.IexBackend do
   def handle_io_request(from, {:get_line, :unicode, prompt}, state = %{console: console}) do
     cursor =
       Helpers.transaction console, :mutate do
-        Console.put_string(console, prompt)
+        Console.put_iodata(console, prompt)
         Console.cursor(console)
       end
 
@@ -140,9 +139,13 @@ defmodule ExTerm.IexBackend do
   end
 
   @impl Backend
-  def handle_update(_, console, from, to, cursor, _) do
+  def handle_update(update, %{console: console}) do
     Helpers.transaction console, :access do
-      {:ok, cells: Console.cells(console, from, to), cursor: cursor}
+      if cursor = update.cursor do
+        {:ok, cells: Console.Update.get(console, update), cursor: cursor}
+      else
+        {:ok, cells: Console.Update.get(console, update)}
+      end
     end
   end
 
@@ -215,7 +218,7 @@ defmodule ExTerm.IexBackend do
 
             {end_row, _} =
               console
-              |> Console.insert_string(options, row)
+              |> Console.insert_iodata(options, row)
               |> Console.get_metadata(:cursor)
 
             # rows added

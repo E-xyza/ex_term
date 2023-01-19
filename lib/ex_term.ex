@@ -184,11 +184,18 @@ defmodule ExTerm do
     dispatch(:handle_io_request, [{pid, ref}, request], socket)
   end
 
-  def handle_info(
-        update = %Update{},
-        socket
-      ) do
-    raise "not yet"
+  def handle_info(update = %Update{}, socket = %{assigns: %{console: console}}) do
+    cells = Helpers.transaction  console, :access do
+      Update.get(update, console)
+    end
+
+    new_socket = if cursor = update.cursor do
+      assign(socket, cells: cells, cursor: cursor)
+    else
+      assign(socket, cells: cells)
+    end
+
+    {:noreply, new_socket}
   end
 
   def handle_info({:prompt, activity}, socket) when activity in [:active, :inactive] do

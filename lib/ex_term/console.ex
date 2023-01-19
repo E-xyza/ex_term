@@ -75,8 +75,8 @@ defmodule ExTerm.Console do
   @spec new_row(t, pos_integer() | :end) :: t
 
   # complex cell mutation
-  @spec put_string(t, String.t()) :: t
-  @spec insert_string(t, String.t(), row :: pos_integer()) :: t
+  @spec put_iodata(t, String.t()) :: t
+  @spec insert_iodata(t, String.t(), row :: pos_integer()) :: t
   # @spec clear(t) :: t
 
   #############################################################################
@@ -272,27 +272,32 @@ defmodule ExTerm.Console do
     end)
   end
 
-  def put_string(console, string) do
+  @doc """
+  `inserts` iodata at the location of a cursor.
+  """
+  def put_iodata(console, iodata) do
     console
     |> StringTracker.new()
-    |> StringTracker.put_string_rows(string)
+    |> StringTracker.put_string_rows(IO.iodata_to_binary(iodata))
     |> StringTracker.flush_updates()
     |> Map.fetch!(:console)
   end
 
   @doc """
-  `inserts` a string at a certain row.
+  `inserts` iodata at a certain row.
 
-  This will "push down" as many lines as is necessary to insert the string.
+  This will "push down" as many lines as is necessary to insert the iodata.
   If the current cursor precedes the insertion point, it will be unaffected.
   If the current cursor is after the insertion point, it will be displaced
-  as many lines as makes sense.
-
-  TBD: what do "clear" and "ansi shift" commands do?
+  as many lines as are necessary
   """
-  def insert_string(console, string, row) do
+  def insert_iodata(console, iodata, row) do
     # the claim here is that everything after a given location must be broadcast.
     Update.register_cell_change(console, {{row, 1}, :end})
+
+    string = iodata
+    |> IO.iodata_to_binary()
+    |> String.replace_suffix("\n", "")
 
     console
     |> StringTracker.new(row)

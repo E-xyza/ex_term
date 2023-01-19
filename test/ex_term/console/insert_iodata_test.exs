@@ -17,7 +17,7 @@ defmodule ExTermTest.Console.InsertStringTest do
     {:ok, console: Console.new(handle_update: &updates/1, layout: {5, 5})}
   end
 
-  describe "insert_string/3" do
+  describe "insert_iodata/3" do
     test "works when the string is contained in the row", %{console: console} do
       # note that the cursor starts at {1, 1}
       Helpers.transaction console, :mutate do
@@ -31,7 +31,7 @@ defmodule ExTermTest.Console.InsertStringTest do
       assert_receive %Update{changes: [{{1, 1}, {1, :end}}]}
 
       Helpers.transaction console, :mutate do
-        Console.insert_string(console, "foo", 1)
+        Console.insert_iodata(console, "foo", 1)
       end
 
       assert_receive %Update{changes: [{{1, 1}, :end}], cursor: {2, 1}}
@@ -62,7 +62,7 @@ defmodule ExTermTest.Console.InsertStringTest do
       assert_receive %Update{changes: [{{1, 1}, {2, :end}}]}
 
       Helpers.transaction console, :mutate do
-        Console.insert_string(console, "foo", 2)
+        Console.insert_iodata(console, "foo", 2)
       end
 
       assert_receive %Update{changes: [{{2, 1}, :end}], cursor: nil}
@@ -92,7 +92,7 @@ defmodule ExTermTest.Console.InsertStringTest do
       assert_receive %Update{changes: [{{1, 1}, {1, :end}}]}
 
       Helpers.transaction console, :mutate do
-        Console.insert_string(console, "foobar", 1)
+        Console.insert_iodata(console, "foobar", 1)
       end
 
       assert_receive %Update{changes: [{{1, 1}, :end}], cursor: {3, 1}}

@@ -3,7 +3,7 @@ defmodule ExTerm.Console.StringTracker do
 
   # special private module that encapsulates and stores compound string
   # operations on the console.  This module allows code sharing between the
-  # put_string and insert_string functionality.  It tracks a set of changes that
+  # put_iodata and insert_iodata functionality.  It tracks a set of changes that
   # are directed by an input string (e.g. unicode characters put at cursor
   # location, style changes, etc.) and virtualizes them into a list of
   # cellinfo changes to be flushed to the console later.
@@ -155,7 +155,7 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   def _blit_string_row(tracker = %{cursor: {row, column}}, columns, "")
-      when column === columns + 1 do
+      when column !== 1 and column === columns + 1 do
     %{tracker | cursor: {row + 1, 1}}
   end
 

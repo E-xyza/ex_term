@@ -16,11 +16,11 @@ defmodule ExTermTest.Console.PutStringTest do
     {:ok, console: Console.new(handle_update: &updates/1, layout: {5, 5})}
   end
 
-  describe "put_string/2" do
+  describe "put_iodata/2" do
     test "works when nothing exists in the row and string is contained", %{console: console} do
       # note that the cursor starts at {1, 1}
       Helpers.transaction console, :mutate do
-        Console.put_string(console, "foo")
+        Console.put_iodata(console, "foo")
       end
 
       assert_receive %{cursor: {1, 4}, changes: [{{1, 1}, {1, :end}}]}
@@ -42,7 +42,7 @@ defmodule ExTermTest.Console.PutStringTest do
       end
 
       Helpers.transaction console, :mutate do
-        Console.put_string(console, "foo")
+        Console.put_iodata(console, "foo")
       end
 
       assert_receive %{cursor: {1, 4}, changes: [{{1, 1}, {1, 4}}]}
@@ -62,7 +62,7 @@ defmodule ExTermTest.Console.PutStringTest do
     } do
       # note that the cursor starts at {1, 1}
       Helpers.transaction console, :mutate do
-        Console.put_string(console, "fooba")
+        Console.put_iodata(console, "fooba")
       end
 
       assert_receive %{cursor: {2, 1}, changes: [{{1, 1}, {1, :end}}]}
@@ -82,7 +82,7 @@ defmodule ExTermTest.Console.PutStringTest do
     test "works when nothing exists in the row and string overflows", %{console: console} do
       # note that the cursor starts at {1, 1}
       Helpers.transaction console, :mutate do
-        Console.put_string(console, "foobar")
+        Console.put_iodata(console, "foobar")
       end
 
       assert_receive %{cursor: {2, 2}, changes: [{{1, 1}, {2, :end}}]}
@@ -105,7 +105,7 @@ defmodule ExTermTest.Console.PutStringTest do
       test "works when hard return (#{return}) causes string overflow", %{console: console} do
         # note that the cursor starts at {1, 1}
         Helpers.transaction console, :mutate do
-          Console.put_string(console, "foo#{unquote(return)}bar")
+          Console.put_iodata(console, "foo#{unquote(return)}bar")
         end
 
         assert_receive %{cursor: {2, 4}, changes: [{{1, 1}, {2, :end}}]}
@@ -127,9 +127,18 @@ defmodule ExTermTest.Console.PutStringTest do
       end
     end
 
+    test "works when hard return is at the end", %{console: console} do
+      # note that the cursor starts at {1, 1}
+      Helpers.transaction console, :mutate do
+        Console.put_iodata(console, "foo\n")
+      end
+
+      assert_receive %{cursor: {2, 1}, changes: [{{1, 1}, {1, :end}}]}
+    end
+
     test "ANSI code can change the style", %{console: console} do
       Helpers.transaction console, :mutate do
-        Console.put_string(console, "f" <> IO.ANSI.red() <> "oo")
+        Console.put_iodata(console, "f" <> IO.ANSI.red() <> "oo")
       end
 
       assert_receive %{cursor: {1, 4}, changes: [{{1, 1}, {1, :end}}]}

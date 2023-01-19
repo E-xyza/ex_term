@@ -59,7 +59,7 @@ defmodule ExTerm.IexBackend.Prompt do
     Helpers.transaction console, :mutate do
       console
       |> Console.move_cursor(prompt.location)
-      |> Console.put_string(full_content)
+      |> Console.put_iodata(full_content)
     end
 
     ExTerm.io_reply(prompt.reply, full_content)
@@ -114,14 +114,14 @@ defmodule ExTerm.IexBackend.Prompt do
 
       console
       |> Console.move_cursor(prompt.location)
-      |> Console.put_string(precursor)
+      |> Console.put_iodata(precursor)
 
       cursor = Console.cursor(console)
 
       postcursor = IO.iodata_to_binary(prompt.postcursor ++ List.wrap(extras))
 
       console
-      |> Console.put_string(postcursor)
+      |> Console.put_iodata(postcursor)
       |> Console.move_cursor(cursor)
     end
 
