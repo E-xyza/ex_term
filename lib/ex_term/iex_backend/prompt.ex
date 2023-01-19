@@ -120,9 +120,8 @@ defmodule ExTerm.IexBackend.Prompt do
 
       postcursor = IO.iodata_to_binary(prompt.postcursor ++ List.wrap(extras))
 
-      console
-      |> Console.put_iodata(postcursor)
-      |> Console.move_cursor(cursor)
+      Console.put_iodata(console, postcursor)
+      Console.move_cursor(console, cursor)
     end
 
     prompt
