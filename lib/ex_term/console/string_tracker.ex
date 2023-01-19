@@ -1,41 +1,61 @@
 defmodule ExTerm.Console.StringTracker do
   @moduledoc false
 
-  # special module to do simple compound string operations on the console.
-  # this includes:
+  # special private module that encapsulates and stores compound string
+  # operations on the console.  This module allows code sharing between the
+  # put_iodata and insert_iodata functionality.  It tracks a set of changes that
+  # are directed by an input string (e.g. unicode characters put at cursor
+  # location, style changes, etc.) and virtualizes them into a list of
+  # cellinfo changes to be flushed to the console later.
   #
+  # if the StringTracker runs into a console control character, it will eject
+  # from the normal change buffering mode and paint directly onto the console,
+  # possibly updating the column width (but only if expansion is needed).
+  #
+  # Private exported interface:
+  #
+  # - new
   # - put_string_rows
   # - insert_string_rows
+  # - flush_updates
+  #
+  # Testable but private:
+  #
+  # - _blit_string_row
 
   use MatchSpec
 
   alias ExTerm.Console
   alias ExTerm.Console.Cell
+  alias ExTerm.Console.Update
+
   require Console
 
   @enforce_keys [
-    :insertion,
     :console,
+    :mode,
     :style,
     :cursor,
     :old_cursor,
     :layout,
-    :first_updated,
-    :last_updated,
     :last_cell
   ]
-  defstruct @enforce_keys ++ [updates: []]
+
+  defstruct @enforce_keys ++ [update: %Update{}, cells: []]
+
+  @type mode ::
+          :put | :paint | {:insert, from_row :: pos_integer(), total_rows :: non_neg_integer()}
 
   @type t :: %__MODULE__{
-          insertion: nil | pos_integer(),
           console: Console.t(),
+          mode: mode,
           style: Style.t(),
           cursor: Console.location(),
           old_cursor: Console.location(),
           layout: Console.location(),
-          first_updated: Console.location(),
-          last_updated: Console.location(),
-          last_cell: Console.location()
+          last_cell: Console.location(),
+          update: Update.t(),
+          cells: [Console.cellinfo()]
         }
 
   @spec new(Console.t(), nil | pos_integer()) :: t
@@ -43,366 +63,193 @@ defmodule ExTerm.Console.StringTracker do
     [cursor: old_cursor, layout: layout, style: style] =
       Console.get_metadata(console, [:cursor, :layout, :style])
 
-    new_cursor = if insertion, do: {insertion, 1}, else: old_cursor
+    {new_cursor, mode} =
+      if insertion do
+        {{insertion, 1}, {:insert, insertion, 1}}
+      else
+        {old_cursor, :put}
+      end
+
     last_cell = Console.last_cell(console)
 
     %__MODULE__{
-      insertion: insertion,
+      mode: mode,
       cursor: new_cursor,
       old_cursor: old_cursor,
       style: style,
       console: console,
       layout: layout,
-      first_updated: new_cursor,
-      last_updated: new_cursor,
       last_cell: last_cell
     }
   end
 
   @spec put_string_rows(t(), String.t()) :: t()
-  def put_string_rows(tracker = %{insertion: nil}, string) do
-    # NB: don't cache the number of rows.  Row length should be fixed once set.
-    columns = columns_for_row(tracker)
+  def put_string_rows(tracker = %{mode: :put, cursor: {row, _}}, string) do
+    # NB: don't cache the number of rows.  Row length should be fixed based on
+    # the existing capacity of the column, so we have to check each time.
 
-    case put_string_row(tracker, columns, string) do
+    case _blit_string_row(tracker, Console.columns(tracker.console, row), string) do
       # exhausted the row without finishing the string
       {updated_tracker, leftover} ->
         put_string_rows(updated_tracker, leftover)
 
       done ->
         done
-        |> pad_last_row(columns)
-        |> update_insert()
     end
   end
 
   @spec insert_string_rows(t(), String.t()) :: t()
-  def insert_string_rows(tracker = %{insertion: row}, string) when is_integer(row) do
+  def insert_string_rows(
+        tracker = %{mode: {:insert, _, _}, cursor: {row, _}, layout: {_, columns}},
+        string
+      ) do
     # NB: don't cache the number of columns.  Row length should be fixed based
-    # on the existing capacity of the columns so far.
+    # on the existing capacity of the column, so we have to check each time.
 
-    columns = columns_for_row(tracker)
+    # for string row insertion, we're going to always add the row in to the cells
+    # buffer, because this will always be "in-order".
+    columns =
+      case Console.columns(tracker.console, row) do
+        0 -> columns
+        other -> other
+      end
 
-    case put_string_row(tracker, columns, string) do
+    case _blit_string_row(tracker, columns, string) do
       {new_tracker, leftover} ->
         insert_string_rows(new_tracker, leftover)
 
-      done = %{updates: [{{last_row, _}, _} | _]} ->
-        # figure out how many rows we need to move.  This is determined by the number
-        # of rows in the update.  Let's assume that it is the row of the first item.
-
-        move_distance = last_row - row + 1
-
-        done
-        |> pad_last_row(columns)
-        |> move_succeeding_rows(row, move_distance)
-        |> update_cursor(tracker.old_cursor, row, move_distance)
-        |> update_insert()
+      done ->
+        hard_return(done, columns)
     end
   end
 
-  defp columns_for_row(tracker = %{console: console, cursor: {row, _}, layout: layout}) do
-    case Console.columns(console, row) do
-      # this row doesn't exist yet.
-      0 -> elem(layout, 1)
-      columns -> columns
-    end
-  end
+  @spec flush_updates(t) :: :ok | Range.t()
+  # flush updates handles three cases depending on what the state of the string tracker
+  # is.  If it's in string mode, then it immediately
+  def flush_updates(tracker = %{mode: {:insert, from_row, count}}) do
+    count = count - 1
+    # note that count has an extra because we do a hard return
+    # at the end of an insert in all cases.
+    update_cells =
+      tracker.console
+      |> Console._bump_rows(from_row, count)
+      |> Enum.reverse(tracker.cells)
 
-  def put_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string)
-      when column > columns do
-    # make sure the update contains a sentinel at the cursor location.
-    {%{tracker | cursor: {row + 1, 1}, updates: [{cursor, Cell.sentinel()} | tracker.updates]},
-     string}
-  end
-
-  def put_string_row(tracker, columns, "\t" <> rest) do
-    {hard_tab(tracker, columns), rest}
-  end
-
-  def put_string_row(tracker, _columns, "\r\n" <> rest) do
-    {hard_return(tracker), rest}
-  end
-
-  def put_string_row(tracker, _columns, "\r" <> rest) do
-    {hard_return(tracker), rest}
-  end
-
-  def put_string_row(tracker, _columns, "\n" <> rest) do
-    {hard_return(tracker), rest}
-  end
-
-  def put_string_row(tracker = %{cursor: cursor}, columns, string = "\e" <> _) do
-    case ExTerm.ANSI.parse(string, {tracker.style, cursor}) do
-      # no cursor change.
-      {rest, {style, ^cursor}} ->
-        put_string_row(%{tracker | style: style}, columns, rest)
-    end
-  end
-
-  def put_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string) do
-    case String.next_grapheme(string) do
-      nil ->
-        tracker
-
-      {grapheme, rest} ->
-        updates = [{cursor, %Cell{char: grapheme, style: tracker.style}} | tracker.updates]
-
-        put_string_row(
-          %{tracker | cursor: {row, column + 1}, last_updated: cursor, updates: updates},
-          columns,
-          rest
-        )
-    end
-  end
-
-  @spec send_update(t, keyword) :: t
-  def send_update(tracker = %{cursor: cursor, console: console, last_updated: last_updated}, opts \\ []) do
-    console
-    |> Console.put_metadata(:cursor, cursor)
-    |> Console.insert(tracker.updates)
-
-    last_updated = case Keyword.get(opts, :with_cursor) do
-      true when cursor < last_updated -> last_updated
-      true -> cursor
-      _ -> last_updated
-    end
-
-    case Console.get_metadata(tracker.console, :handle_update) do
-      fun when is_function(fun, 1) ->
-        fun.(
-          Console.update_msg(
-            from: tracker.first_updated,
-            to: last_updated,
-            cursor: cursor,
-            last_cell: tracker.last_cell
-          )
-        )
-
-      nil ->
-        :ok
-
-      other ->
-        raise "invalid update handler, expected arity 1 fun, got #{inspect(other)}"
-    end
-
-    %{tracker | updates: []}
-  end
-
-  defp pad_last_row(tracker = %{cursor: {_, cursor_column}}, columns) do
-    {row, keys} =
-      Enum.reduce(tracker.updates, {0, MapSet.new()}, fn
-        {location = {this_row, _}, _}, {highest_row, keys} ->
-          new_highest_row = if this_row > highest_row, do: this_row, else: highest_row
-          {new_highest_row, MapSet.put(keys, location)}
-      end)
-
-    new_updates =
-      for column <- cursor_column..columns, {row, column} not in keys, reduce: tracker.updates do
-        updates -> [{{row, column}, %Cell{}} | updates]
-      end
-
-    # fill out the row.
-    %{tracker | updates: prepend_sentinel(new_updates, {row, columns + 1})}
-  end
-
-  # MOVE_SUCCEEDING ROWS.
-
-  # no limit.  Get everything, but don't take the sentinel (default)
-  defmatchspec move_rows_ms(row, destination_row, nil) do
-    {{^row, column}, cell} when cell.char !== "\n" -> {{destination_row, column}, cell}
-  end
-
-  # also grab the sentinel
-  defmatchspec move_rows_ms(row, destination_row, :sentinel) do
-    {{^row, column}, cell} -> {{destination_row, column}, cell}
-  end
-
-  # only grab up to column x
-  defmatchspec move_rows_ms(row, destination_row, limit) when is_integer(limit) do
-    {{^row, column}, cell} when column <= limit -> {{destination_row, column}, cell}
-  end
-
-  @spec move_rows(Console.t(), pos_integer(), pos_integer(), nil | :sentinel | pos_integer()) :: [
-          Console.cell_info()
-        ]
-  defp move_rows(console, row, destination_row, limit \\ nil) do
-    Console.select(console, move_rows_ms(row, destination_row, limit))
-  end
-
-  # terminate when we are trying to move a row greater than the layout size.
-  defp move_succeeding_rows(tracker = %{last_cell: {last_row, _}}, row, _) when row > last_row do
-    tracker
-  end
-
-  defp move_succeeding_rows(
-         tracker = %{console: console, layout: {_, layout_columns}},
-         row,
-         move_distance
-       ) do
-    # get the length of the destination row.
-    destination_row = row + move_distance
-    source_length = Console.columns(console, row)
-    destination_length = Console.columns(console, destination_row)
-
-    new_updates =
-      case source_length do
-        length when length === destination_length ->
-          # destination size matches the source length.
-          console
-          # obtain the row.
-          |> move_rows(row, destination_row)
-          |> Enum.reverse(tracker.updates)
-
-        length when destination_length === 0 and length === layout_columns ->
-          # destination doesn't exist.  Need to make a new row that has a sentinel, but with the same
-          # content.
-          console
-          |> move_rows(row, destination_row, :sentinel)
-          |> Enum.reverse(tracker.updates)
-
-        length when length < destination_length ->
-          # destination is overfull, we need to pad.
-          new_updates =
-            console
-            |> move_rows(row, destination_row)
-            |> Enum.reverse(tracker.updates)
-
-          Enum.reduce((length + 1)..destination_length, new_updates, fn
-            column, so_far -> [{{destination_row, column}, %Cell{}} | so_far]
-          end)
-
-        length when destination_length === 0 and length < layout_columns ->
-          # destination doesn't exist.   We need to transfer AND pad with a sentinel in
-          # the new row.
-
-          new_updates =
-            console
-            |> move_rows(row, destination_row)
-            |> Enum.reverse(tracker.updates)
-
-          (length + 1)..layout_columns
-          |> Enum.reduce(new_updates, fn
-            column, so_far -> [{{destination_row, column}, %Cell{}} | so_far]
-          end)
-          |> List.insert_at(0, {{destination_row, layout_columns + 1}, Cell.sentinel()})
-
-        _ when destination_length === 0 ->
-          # destination doesn't exist.  We need to transfer AND pad with a sentinel
-
-          console
-          |> move_rows(row, destination_row, destination_length)
-          |> Enum.reverse(tracker.updates)
-          |> List.insert_at(0, {{destination_row, layout_columns + 1}, Cell.sentinel()})
-
-        _ ->
-          # destination is underfull but exists, only pull up to destination length
-          console
-          |> move_rows(row, destination_row, destination_length)
-          |> Enum.reverse(tracker.updates)
-      end
-
-    move_succeeding_rows(%{tracker | updates: new_updates}, row + 1, move_distance)
-  end
-
-  defp update_cursor(tracker, old_cursor, insert_row, move_distance) do
     new_cursor =
-      case old_cursor do
-        {row, _} when row < insert_row ->
+      case old_cursor = tracker.old_cursor do
+        {row, _} when row < from_row ->
           old_cursor
 
         {row, column} ->
-          {row + move_distance, column}
+          {row + count, column}
       end
 
-    %{tracker | cursor: new_cursor}
+    tracker.console
+    |> Console.insert(update_cells)
+    |> Console.move_cursor(new_cursor)
+
+    range = from_row..(from_row + count - 1)
+
+    Update.set_insertion(range)
+    Update.merge(tracker.update)
+
+    range
   end
 
-  defp update_insert(tracker = %{updates: [{location = {row, column}, _} | _]}) do
-    %{tracker | last_updated: location, last_cell: {row, column - 1}}
+  def flush_updates(tracker) do
+    tracker.console
+    |> Console.insert(tracker.cells)
+    |> Console.move_cursor(tracker.cursor)
+
+    Update.merge(tracker.update)
+    :ok
+  end
+
+  def _blit_string_row(tracker = %{cursor: {row, column}}, columns, "")
+      when column !== 1 and column === columns + 1 do
+    %{tracker | cursor: {row + 1, 1}}
+  end
+
+  def _blit_string_row(tracker, _, ""), do: tracker
+
+  def _blit_string_row(tracker = %{mode: :put, cursor: {row, _}, layout: {_, columns}}, 0, string) do
+    # since string MUST have a payload, obtain the layout columns and add that row in
+
+    new_cells = Enum.reduce(1..columns, tracker.cells, &[{{row, &1}, %Cell{}} | &2])
+    Console.insert(tracker.console, [{{row, columns + 1}, Cell.sentinel()} | new_cells])
+
+    tracker
+    |> Map.replace!(:update, Update.merge_into(tracker.update, {{row, 1}, {row, :end}}))
+    |> _blit_string_row(columns, string)
+  end
+
+  def _blit_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string)
+      when column > columns do
+    # make sure that the update reflects that this is the end line
+    new_update =
+      tracker
+      |> Map.replace!(:update, Update.merge_into(tracker.update, {cursor, {row, :end}}))
+      |> hard_return(columns)
+
+    {new_update, string}
+  end
+
+  def _blit_string_row(tracker, columns, "\t" <> rest) do
+    _blit_string_row(hard_tab(tracker), columns, rest)
+  end
+
+  def _blit_string_row(tracker, columns, "\r\n" <> rest) do
+    {hard_return(tracker, columns), rest}
+  end
+
+  def _blit_string_row(tracker, columns, "\r" <> rest) do
+    {hard_return(tracker, columns), rest}
+  end
+
+  def _blit_string_row(tracker, columns, "\n" <> rest) do
+    {hard_return(tracker, columns), rest}
+  end
+
+  def _blit_string_row(tracker = %{cursor: cursor}, columns, string = "\e" <> _) do
+    case ExTerm.ANSI.parse(string, {tracker.style, cursor}) do
+      # no cursor change.
+      {rest, {style, ^cursor}} ->
+        _blit_string_row(%{tracker | style: style}, columns, rest)
+    end
+  end
+
+  def _blit_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string) do
+    case String.next_grapheme(string) do
+      {grapheme, rest} ->
+        new_cells = [{cursor, %Cell{char: grapheme, style: tracker.style}} | tracker.cells]
+
+        new_update = Update.merge_into(tracker.update, cursor)
+
+        tracker
+        |> Map.merge(%{cursor: {row, column + 1}, update: new_update, cells: new_cells})
+        |> _blit_string_row(columns, rest)
+    end
   end
 
   # special events that are common
-
-  defguardp is_inserting(tracker) when tracker.insertion !== nil
-
-  # if we're beyond the last row of the console (or doing an insertion), go ahead and
-  # fill in the rest of the row.  In both cases, we can defer sending the update because
-  # we know that updates from here on are going to be continuous.
-  defp hard_return(
-         tracker = %{cursor: {row, column}, last_cell: {last_row, _}, layout: {_, columns}}
-       )
-       when row > last_row or is_inserting(tracker) do
-    updates =
-      column..columns
-      |> Enum.reduce(tracker.updates, &prepend_blank(&2, {row, &1}))
-      |> prepend_sentinel({row, columns + 1})
-
-    %{tracker | cursor: {row + 1, 1}, updates: updates, last_cell: {row + 1, columns}}
+  defp hard_tab(tracker = %{cursor: {row, column}}) do
+    new_cursor = {row, tab_destination(column, 10)}
+    %{tracker | cursor: new_cursor, update: %{tracker.update | cursor: new_cursor}}
   end
 
-  defp hard_return(tracker = %{cursor: {row, _column}}) do
-    new_cursor = {row + 1, 1}
+  defp hard_return(tracker = %{cursor: {row, column}, mode: {:insert, start, rows}}, columns) do
+    new_mode = {:insert, start, rows + 1}
 
-    tracker
-    |> Map.put(:cursor, new_cursor)
-    |> send_update
-    |> Map.merge(%{first_updated: new_cursor, last_updated: new_cursor})
+    new_cells = Enum.reduce(column..columns, tracker.cells, &[{{row, &1}, %Cell{}} | &2])
+
+    %{tracker | cursor: {row + 1, 1}, mode: new_mode, cells: new_cells}
   end
 
-  # if we're beyond the last row of the console (or doing an insertion), go
-  # ahead and fill in to the position of where we are.
-  defp hard_tab(
-         tracker = %{
-           cursor: {row, column},
-           last_cell: last_cell = {last_row, _},
-           layout: {_, columns}
-         },
-         _
-       )
-       when row > last_row or is_inserting(tracker) do
-    {new_cursor, updates, new_last_cell} =
-      case tab_destination(column) do
-        new_column when new_column >= columns ->
-          updates =
-            column..columns
-            |> Enum.reduce(tracker.updates, &prepend_blank(&2, {row, &1}))
-            |> prepend_sentinel({row, columns + 1})
-
-          {{row + 1, 1}, updates, {last_row, columns}}
-
-        new_column ->
-          updates =
-            Enum.reduce(column..(new_column - 1), tracker.updates, &prepend_blank(&2, {row, &1}))
-
-          {{row, new_column}, updates, last_cell}
-      end
-
-    %{tracker | cursor: new_cursor, updates: updates, last_cell: new_last_cell}
+  defp hard_return(tracker = %{cursor: {row, _}}, _) do
+    %{tracker | cursor: {row + 1, 1}}
   end
 
-  # since we are doing a disjoint update, we should send an update, early.
-  defp hard_tab(tracker = %{cursor: {row, column}}, columns) do
-    new_cursor =
-      case tab_destination(column) do
-        new_column when new_column > columns ->
-          {row + 1, 1}
-
-        new_column ->
-          {row, new_column}
-      end
-
-    tracker
-    |> Map.put(:cursor, new_cursor)
-    |> send_update
-    |> Map.merge(%{first_updated: new_cursor, last_updated: new_cursor})
-  end
-
-  # NOTE THE ORDER OF THE ARGUMENTS CAREFULLY
-  defp prepend_blank(updates, location), do: [{location, %Cell{}} | updates]
-  defp prepend_sentinel(updates, location), do: [{location, Cell.sentinel()} | updates]
-
-  defp tab_destination(column) do
-    (div(column, 10) + 1) * 10
+  defp tab_destination(column, tab_length) do
+    (div(column, tab_length) + 1) * tab_length
   end
 end

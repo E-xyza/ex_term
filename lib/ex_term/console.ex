@@ -22,6 +22,7 @@ defmodule ExTerm.Console do
 
   alias ExTerm.Console.Cell
   alias ExTerm.Console.StringTracker
+  alias ExTerm.Console.Update
   alias ExTerm.Style
 
   import ExTerm.Console.Helpers
@@ -31,18 +32,11 @@ defmodule ExTerm.Console do
             {:private | :protected, pid, :ets.table()}
             | {:public, pid, :ets.table(), :atomics.atomics_ref()}
   @type location :: {pos_integer(), pos_integer()}
+  @type layout :: location | {0, 0}
   @type update ::
           {:xterm_console_update, from :: location, to :: location, cursor :: location,
            last_cell :: location}
   @type cellinfo :: {location, Cell.t()}
-
-  # message typing
-  @type update_msg :: update
-  defmacro update_msg(from: from, to: to, cursor: cursor, last_cell: last_cell) do
-    quote do
-      {:xterm_console_update, unquote(from), unquote(to), unquote(cursor), unquote(last_cell)}
-    end
-  end
 
   ############################################################################
   ## rendering function
@@ -57,6 +51,33 @@ defmodule ExTerm.Console do
 
   #############################################################################
   ## API
+
+  @spec new(keyword) :: t
+
+  # metadata access
+  @spec layout(t) :: location
+  @spec cursor(t) :: location
+  @spec style(t) :: Style.t()
+  @spec get_metadata(t, atom | [atom]) :: term
+
+  # metadata mutations
+  @spec put_metadata(t, atom, term) :: t
+  @spec put_metadata(t, keyword) :: t
+  @spec delete_metadata(t, atom) :: t
+
+  @spec move_cursor(t, location) :: t
+
+  # cell access
+  @spec get(t, location | Update.cell_range() | Update.end_range()) :: nil | Cell.t() | [Cell.t()]
+
+  # primitive cell mutation
+  @spec put_cell(t, location, Cell.t()) :: t
+  @spec new_row(t, pos_integer() | :end) :: t
+
+  # complex cell mutation
+  @spec put_iodata(t, String.t()) :: :ok
+  @spec insert_iodata(t, String.t(), row :: pos_integer()) :: Range.t()
+  # @spec clear(t) :: t
 
   #############################################################################
   ## GUARDS
@@ -75,15 +96,14 @@ defmodule ExTerm.Console do
 
   defguard is_local(console) when node(custodian(console)) === node()
 
-  defp table(console), do: elem(console, 2)
+  defguard location(cellinfo) when elem(cellinfo, 0)
 
   #############################################################################
   ## CONSOLE ETS interactions
 
-  @spec new(keyword) :: t
   def new(opts \\ []) do
     permission = Keyword.get(opts, :permission, :protected)
-    {rows, columns} = layout = Keyword.get(opts, :layout, {24, 80})
+    layout = Keyword.get(opts, :layout, {24, 80})
     update_handler = Keyword.get(opts, :handle_update)
     table = :ets.new(__MODULE__, [permission, :ordered_set])
 
@@ -94,8 +114,7 @@ defmodule ExTerm.Console do
       end
 
     transaction(console, :mutate) do
-      console
-      |> put_metadata(
+      put_metadata(console,
         layout: layout,
         cursor: {1, 1},
         style: %Style{},
@@ -104,29 +123,27 @@ defmodule ExTerm.Console do
     end
   end
 
-  @spec layout(t) :: location
   def layout(console) do
     get_metadata(console, :layout)
   end
 
-  @spec cursor(t) :: location
   def cursor(console) do
     get_metadata(console, :cursor)
   end
 
-  @spec style(t) :: Style.t()
   def style(console) do
     get_metadata(console, :style)
   end
 
   # basic access functions
 
-  defmatchspecp get_ms({key, value}) do
-    {{^key, ^value}, cell} -> cell
+  require Update
+
+  defmatchspecp get_ms(location) when Update.is_location(location) do
+    {^location, cell} -> cell
   end
 
-  @spec get(t, location) :: nil | Cell.t()
-  def get(console, location) do
+  def get(console, location) when Update.is_location(location) do
     console
     |> select(get_ms(location))
     |> case do
@@ -143,7 +160,6 @@ defmodule ExTerm.Console do
     tuple = {key, _} when key in keys -> tuple
   end
 
-  @spec get_metadata(t, atom | [atom]) :: term
   @doc """
   obtains a single key metadata or a list of keys.
 
@@ -159,93 +175,134 @@ defmodule ExTerm.Console do
 
   # basic mutations
 
-  @spec put_metadata(t, atom, term) :: t
   def put_metadata(console, key, value) do
     insert(console, [{key, value}])
   end
 
-  @spec put_metadata(t, keyword) :: t
   def put_metadata(console, keyword) do
     insert(console, keyword)
   end
 
-  @spec delete_metadata(t, atom) :: t
   def delete_metadata(console, key) do
     delete(console, key)
   end
 
-  @spec put_cell(t, location, Cell.t()) :: t
   def put_cell(console, location, char) do
-    last_cell = last_cell(console)
+    Update.register_cell_change(console, location)
 
     console
     |> insert({location, char})
-    |> update_with(location, location, last_cell)
   end
 
-  # compound operations
-  defmatchspecp bump_rows_after(line) do
-    {{row, column}, cell} when row >= line -> {{row + 1, column}, cell}
+  defmatchspecp rows_from(starting_row) do
+    tuple = {{row, _}, cell} when row >= starting_row -> tuple
   end
 
-  @spec new_row(t, pos_integer() | :end) :: t
   def new_row(console, insertion_at \\ :end)
 
   def new_row(console, :end) do
     {row, _} = last_cell(console)
     new_row = row + 1
     {_rows, columns} = layout(console)
+    Update.register_cell_change(console, {{new_row, 1}, {new_row, :end}})
 
-    # note it's okay to put that last one out of order because ets will
-    # order it correctly.
-    console
-    |> insert(make_blank_row(new_row, columns))
-    |> update_with({new_row, 1}, {new_row, columns + 1}, {new_row, columns})
+    insert(console, make_blank_row(new_row, columns))
   end
 
-  def new_row(console, line) when is_integer(line) do
-    new_row_columns = columns(console, line)
-    {last_row, last_column} = last_cell(console)
+  def new_row(console, row) when is_integer(row) do
+    # does row exist?
+    new_row_columns =
+      case columns(console, row) do
+        0 ->
+          raise "attempted to insert row into row #{row} but the destination does not exist"
 
-    moved_rows = select(console, bump_rows_after(line))
+        columns ->
+          columns
+      end
 
-    update =
-      line
-      |> make_blank_row(new_row_columns)
-      |> Enum.reverse(moved_rows)
+    # note that if the console cursor row is bigger than the row we'll need to move it.
+    case cursor(console) do
+      {cursor_row, cursor_column} when cursor_row >= row ->
+        Update.change_cursor({cursor_row + 1, cursor_column})
 
-    console
-    |> insert(update)
-    |> update_with({line, 1}, {last_row + 1, last_column}, {last_row + 1, last_column - 1})
+      _ ->
+        :ok
+    end
+
+    # register the update that we will need to do.
+    Update.register_cell_change(console, {{row, 1}, :end})
+
+    moved_rows = _bump_rows(console, row, 1)
+
+    insertion =
+      1..new_row_columns
+      |> Enum.reduce(moved_rows, fn index, so_far ->
+        [{{row, index}, %Cell{}} | so_far]
+      end)
+      |> List.insert_at(0, {{row, new_row_columns + 1}, Cell.sentinel()})
+
+    insert(console, insertion)
   end
 
-  @spec put_string(t, String.t()) :: t
-  def put_string(console, string) do
+  @spec _bump_rows(t, pos_integer, pos_integer) :: [cellinfo]
+  @doc false
+  def _bump_rows(console, from_row, count) do
+    grouped_rows =
+      console
+      |> select(rows_from(from_row))
+      |> Enum.group_by(&elem(location(&1), 0))
+
+    Enum.flat_map(grouped_rows, fn
+      {row, list} when is_map_key(grouped_rows, row + count) ->
+        # when the row exists, then we have to conform to the length of the
+        # target row.  Truncate to that length.
+        list
+        |> Enum.zip(grouped_rows[row + count])
+        |> Enum.map(fn
+          # sentinel for destination row
+          {_, dest = {_, %{char: "\n"}}} -> dest
+          # sentinel for source row
+          {{_, %{char: "\n"}}, dest} -> dest
+          {{{row, col}, cell}, _} -> {{row + count, col}, cell}
+        end)
+
+      {_, list} ->
+        # last line gets copied over outright
+        Enum.map(list, fn {{row, col}, cell} -> {{row + count, col}, cell} end)
+    end)
+  end
+
+  @doc """
+  `inserts` iodata at the location of a cursor.
+  """
+  def put_iodata(console, iodata) do
     console
     |> StringTracker.new()
-    |> StringTracker.put_string_rows(string)
-    |> StringTracker.send_update(with_cursor: true)
-    |> Map.get(:console)
+    |> StringTracker.put_string_rows(IO.iodata_to_binary(iodata))
+    |> StringTracker.flush_updates()
   end
 
-  @spec insert_string(t, String.t(), row :: pos_integer()) :: t
   @doc """
-  `inserts` a string at a certain row.
+  `inserts` iodata at a certain row.
 
-  This will "push down" as many lines as is necessary to insert the string.
+  This will "push down" as many lines as is necessary to insert the iodata.
   If the current cursor precedes the insertion point, it will be unaffected.
   If the current cursor is after the insertion point, it will be displaced
-  as many lines as makes sense.  ANSI "cursor" movements in the context of
-  this insertion are PINNED to the full lines of the inserted content.
-
-  An ANSI "clear" operation only clears the region inserted so far.
+  as many lines as are necessary
   """
-  def insert_string(console, string, row) do
+  def insert_iodata(console, iodata, row) do
+    # the claim here is that everything after a given location must be broadcast.
+    Update.register_cell_change(console, {{row, 1}, :end})
+
+    string =
+      iodata
+      |> IO.iodata_to_binary()
+      |> String.replace_suffix("\n", "")
+
     console
     |> StringTracker.new(row)
     |> StringTracker.insert_string_rows(string)
-    |> StringTracker.send_update()
-    |> Map.get(:console)
+    |> StringTracker.flush_updates()
   end
 
   defmatchspecp cell_range_ms(row, column_start, row, column_end) do
@@ -272,41 +329,47 @@ defmodule ExTerm.Console do
       tuple
   end
 
-  @spec cells(t, location, location) :: [cellinfo]
-  def cells(console, {row_start, column_start}, {row_end, column_end}) do
-    select(console, cell_range_ms(row_start, column_start, row_end, column_end))
+  def move_cursor(console, new_cursor = {row, column}) do
+    old_cursor = cursor(console)
+
+    if old_cursor === new_cursor do
+      console
+    else
+      changes =
+        case {last_cell(console), has?(console, new_cursor)} do
+          {_, true} ->
+            [old_cursor, new_cursor]
+
+          {{last_row, _}, false} when last_row + 1 === row and column === 1 ->
+            [old_cursor]
+
+          {last, false} ->
+            raise "cursor move exceeded the console buffer (#{move_msg(console, last, new_cursor)})"
+        end
+
+      Update.change_cursor(new_cursor)
+
+      console
+      |> Update.register_cell_change(changes)
+      |> put_metadata(:cursor, new_cursor)
+    end
   end
 
-  @spec move_cursor(t(), any) :: t()
-  def move_cursor(console, new_cursor) do
-    old_cursor = cursor(console)
-    last_cell = last_cell(console)
+  def move_msg(_, {last_row, _}, {cursor_row, _}) when cursor_row > last_row do
+    "cursor row #{cursor_row} is beyond the last console row #{last_row}"
+  end
 
-    console
-    |> put_metadata(:cursor, new_cursor)
-    |> update_with(old_cursor, old_cursor, new_cursor, last_cell)
-    |> update_with(new_cursor, new_cursor, new_cursor, last_cell)
+  def move_msg(console, _, {cursor_row, cursor_col}) do
+    "cursor column #{cursor_col} is beyond the last column of row #{cursor_row}: #{columns(console, cursor_row)}"
   end
 
   # functional utilities
-
-  @spec update_with(
-          t,
-          from :: location,
-          to :: location,
-          cursor :: location,
-          last_cell :: location
-        ) :: t
-  @spec update_with(t, from :: location, to :: location, last_cell :: location) :: t
-  defp update_with(console, from, to, last_cell) do
-    cursor = cursor(console)
-    update_with(console, from, to, cursor, last_cell)
-  end
-
-  defp update_with(console, from, to, cursor, last_cell) do
+  @doc false
+  # this is for internal use only.
+  def update_with(console, update) do
     case get_metadata(console, :handle_update) do
       fun when is_function(fun, 1) ->
-        fun.(update_msg(from: from, to: to, cursor: cursor, last_cell: last_cell))
+        fun.(update)
 
       nil ->
         :ok
@@ -338,10 +401,8 @@ defmodule ExTerm.Console do
 
   If the row doesn't exist, returns 0.
   """
-  defaccess columns(console, row) do
-    console
-    |> table()
-    |> :ets.select_count(column_count_ms(row))
+  def columns(console, row) do
+    select_count(console, column_count_ms(row))
   end
 
   @spec full_row(t, row :: pos_integer, with_sentinel? :: boolean) :: [cellinfo]
@@ -354,7 +415,22 @@ defmodule ExTerm.Console do
     select(console, full_row_ms(row, with_sentinel?))
   end
 
-  @spec last_cell(t) :: location
+  @spec has?(t, location) :: boolean
+  def has?(console, location) do
+    not is_nil(lookup(console, location))
+  end
+
+  @spec last_column?(t, location) :: boolean
+  @doc """
+  returns true if the cell exists and the location is on the last column of its
+  row, not inclusive of the sentinel.  Note this returns false if it's the
+  sentinel.
+  """
+  def last_column?(console, {row, column}) do
+    match?({_, %{char: "\n"}}, lookup(console, {row, column + 1}))
+  end
+
+  @spec last_cell(t) :: layout
   @doc """
   returns the last location on the console.
 
@@ -363,14 +439,11 @@ defmodule ExTerm.Console do
 
   If the table is empty and only contains metadata, returns `{0, 0}`
   """
-  defaccess last_cell(console) do
-    # the last item in the table encodes the last row because the ordered
+  def last_cell(console) do
+    # the last key in the table encodes the last row because the ordered
     # set is ordered based on erlang term order and erlang term order puts tuples
     # behind atoms, which are the only two types in the table.
-    console
-    |> table()
-    |> :ets.last()
-    |> case do
+    case last(console) do
       {row, column} -> {row, column - 1}
       metadata when is_atom(metadata) -> {0, 0}
     end
@@ -378,11 +451,36 @@ defmodule ExTerm.Console do
 
   # generic access functions
 
-  @spec select(t, :ets.match_spec()) :: [tuple]
+  @spec last(t) :: location | atom
+  defaccess last(console) do
+    console
+    |> table()
+    |> :ets.last()
+  end
+
+  @spec lookup(t, location) :: cellinfo | nil
+  defaccess lookup(console, location) do
+    console
+    |> table()
+    |> :ets.lookup(location)
+    |> case do
+      [cell] -> cell
+      [] -> nil
+    end
+  end
+
+  @spec select(t, :ets.match_spec()) :: [cellinfo]
   defaccess select(console, ms) do
     console
     |> table()
     |> :ets.select(ms)
+  end
+
+  @spec select_count(t, :ets.match_spec()) :: non_neg_integer
+  defaccess select_count(console, ms) do
+    console
+    |> table
+    |> :ets.select_count(ms)
   end
 
   @spec insert(t, tuple | [tuple]) :: t
@@ -412,4 +510,6 @@ defmodule ExTerm.Console do
         end
     ]
   end
+
+  defp table(console), do: elem(console, 2)
 end

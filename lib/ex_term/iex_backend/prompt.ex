@@ -3,6 +3,7 @@ defmodule ExTerm.IexBackend.Prompt do
 
   alias ExTerm.Console
   alias ExTerm.Console.Helpers
+  alias ExTerm.IOServer
 
   require Helpers
 
@@ -59,10 +60,10 @@ defmodule ExTerm.IexBackend.Prompt do
     Helpers.transaction console, :mutate do
       console
       |> Console.move_cursor(prompt.location)
-      |> Console.put_string(full_content)
+      |> Console.put_iodata(full_content)
     end
 
-    ExTerm.io_reply(prompt.reply, full_content)
+    IOServer.reply(prompt.reply, full_content)
     nil
   end
 
@@ -76,9 +77,10 @@ defmodule ExTerm.IexBackend.Prompt do
   end
 
   def append(prompt, charlist) do
-    precursor = charlist
-    |> breakdown
-    |> Kernel.++(prompt.precursor)
+    precursor =
+      charlist
+      |> breakdown
+      |> Kernel.++(prompt.precursor)
 
     paint(%{prompt | precursor: precursor})
   end
@@ -86,6 +88,10 @@ defmodule ExTerm.IexBackend.Prompt do
   def substitute(prompt, substitution) do
     precursor = breakdown(substitution)
     paint(%{prompt | precursor: precursor})
+  end
+
+  def bump_prompt(prompt = %{location: {row, column}}, start..finish) do
+    %{prompt | location: {row + finish - start + 1, column}}
   end
 
   defp breakdown(charlist_or_string, so_far \\ [])
@@ -113,15 +119,14 @@ defmodule ExTerm.IexBackend.Prompt do
 
       console
       |> Console.move_cursor(prompt.location)
-      |> Console.put_string(precursor)
+      |> Console.put_iodata(precursor)
 
       cursor = Console.cursor(console)
 
       postcursor = IO.iodata_to_binary(prompt.postcursor ++ List.wrap(extras))
 
-      console
-      |> Console.put_string(postcursor)
-      |> Console.move_cursor(cursor)
+      Console.put_iodata(console, postcursor)
+      Console.move_cursor(console, cursor)
     end
 
     prompt

@@ -1,4 +1,4 @@
-defmodule ExTerm.Application do
+defmodule ExTerm.DevApplication do
   @moduledoc false
 
   use Application

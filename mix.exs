@@ -25,14 +25,13 @@ defmodule ExTerm.MixProject do
   end
 
   def application do
-    List.wrap(
-      if Mix.env() in @development do
-        [
-          mod: {ExTerm.Application, []},
-          extra_applications: [:logger, :runtime_tools, :iex]
-        ]
-      end
-    )
+    application =
+      if Mix.env() in @development, do: ExTerm.DevApplication, else: ExTerm.Application
+
+    [
+      mod: {application, []},
+      extra_applications: [:logger, :runtime_tools, :iex]
+    ]
   end
 
   defp elixirc_paths(:dev), do: ["lib", "dev"]
