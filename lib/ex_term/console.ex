@@ -75,8 +75,8 @@ defmodule ExTerm.Console do
   @spec new_row(t, pos_integer() | :end) :: t
 
   # complex cell mutation
-  @spec put_iodata(t, String.t()) :: t
-  @spec insert_iodata(t, String.t(), row :: pos_integer()) :: t
+  @spec put_iodata(t, String.t()) :: :ok
+  @spec insert_iodata(t, String.t(), row :: pos_integer()) :: Range.t()
   # @spec clear(t) :: t
 
   #############################################################################
@@ -280,7 +280,6 @@ defmodule ExTerm.Console do
     |> StringTracker.new()
     |> StringTracker.put_string_rows(IO.iodata_to_binary(iodata))
     |> StringTracker.flush_updates()
-    |> Map.fetch!(:console)
   end
 
   @doc """
@@ -304,7 +303,6 @@ defmodule ExTerm.Console do
     |> StringTracker.new(row)
     |> StringTracker.insert_string_rows(string)
     |> StringTracker.flush_updates()
-    |> Map.fetch!(:console)
   end
 
   defmatchspecp cell_range_ms(row, column_start, row, column_end) do

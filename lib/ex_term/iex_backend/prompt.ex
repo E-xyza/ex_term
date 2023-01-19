@@ -89,6 +89,10 @@ defmodule ExTerm.IexBackend.Prompt do
     paint(%{prompt | precursor: precursor})
   end
 
+  def bump_prompt(prompt = %{location: {row, column}}, start..finish) do
+    %{prompt | location: {row + finish - start + 1, column}}
+  end
+
   defp breakdown(charlist_or_string, so_far \\ [])
 
   defp breakdown(string, so_far) when is_list(string) do

@@ -44,10 +44,10 @@ defmodule ExTerm.Console.Update do
     compacted.
   """
   @type t :: %__MODULE__{
-    cursor: nil | Console.location,
-    insertion: nil | Range.t,
-    changes: cell_changes
-  }
+          cursor: nil | Console.location(),
+          insertion: nil | Range.t(),
+          changes: cell_changes
+        }
 
   @doc false
   def init do
@@ -148,7 +148,7 @@ defmodule ExTerm.Console.Update do
     :ok
   end
 
-  @spec set_insertion(Range.t) :: :ok
+  @spec set_insertion(Range.t()) :: :ok
   def set_insertion(range) do
     get_current_update()
     |> Map.put(:insertion, range)

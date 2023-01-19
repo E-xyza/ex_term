@@ -96,19 +96,20 @@ defmodule ExTerm.IexBackend do
 
   ## ROUTER: HANDLE_IO
   def handle_io_request(from, {:put_chars, :unicode, iodata}, state = %{console: console}) do
-    if prompt = state.prompt do
+    new_state =
       Helpers.transaction console, :mutate do
-        {row, _} = prompt.location
-        Console.insert_iodata(console, iodata, row)
+        if prompt = state.prompt do
+          {row, _} = prompt.location
+          range = Console.insert_iodata(console, iodata, row)
+          %{state | prompt: Prompt.bump_prompt(prompt, range)}
+        else
+          Console.put_iodata(console, iodata)
+          state
+        end
       end
-    else
-      Helpers.transaction console, :mutate do
-        Console.put_iodata(console, iodata)
-      end
-    end
 
     ExTerm.io_reply(from)
-    {:noreply, state}
+    {:noreply, new_state}
   end
 
   def handle_io_request(from, {:get_line, :unicode, prompt}, state = %{console: console}) do

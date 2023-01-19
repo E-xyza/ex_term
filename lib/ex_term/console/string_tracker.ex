@@ -99,16 +99,20 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   @spec insert_string_rows(t(), String.t()) :: t()
-  def insert_string_rows(tracker = %{mode: {:insert, _, _}, cursor: {row, _}, layout: {_, columns}}, string) do
+  def insert_string_rows(
+        tracker = %{mode: {:insert, _, _}, cursor: {row, _}, layout: {_, columns}},
+        string
+      ) do
     # NB: don't cache the number of columns.  Row length should be fixed based
     # on the existing capacity of the column, so we have to check each time.
 
     # for string row insertion, we're going to always add the row in to the cells
     # buffer, because this will always be "in-order".
-    columns = case Console.columns(tracker.console, row) do
-      0 -> columns
-      other -> other
-    end
+    columns =
+      case Console.columns(tracker.console, row) do
+        0 -> columns
+        other -> other
+      end
 
     case _blit_string_row(tracker, columns, string) do
       {new_tracker, leftover} ->
@@ -119,7 +123,7 @@ defmodule ExTerm.Console.StringTracker do
     end
   end
 
-  @spec flush_updates(t) :: t
+  @spec flush_updates(t) :: :ok | Range.t()
   # flush updates handles three cases depending on what the state of the string tracker
   # is.  If it's in string mode, then it immediately
   def flush_updates(tracker = %{mode: {:insert, from_row, count}}) do
@@ -144,9 +148,12 @@ defmodule ExTerm.Console.StringTracker do
     |> Console.insert(update_cells)
     |> Console.move_cursor(new_cursor)
 
-    Update.set_insertion(from_row..(from_row + count - 1))
+    range = from_row..(from_row + count - 1)
 
-    flush(tracker)
+    Update.set_insertion(range)
+    Update.merge(tracker.update)
+
+    range
   end
 
   def flush_updates(tracker) do
@@ -154,12 +161,8 @@ defmodule ExTerm.Console.StringTracker do
     |> Console.insert(tracker.cells)
     |> Console.move_cursor(tracker.cursor)
 
-    flush(tracker)
-  end
-
-  defp flush(tracker) do
     Update.merge(tracker.update)
-    %{tracker | cells: [], update: %Update{}, old_cursor: tracker.cursor}
+    :ok
   end
 
   def _blit_string_row(tracker = %{cursor: {row, column}}, columns, "")
