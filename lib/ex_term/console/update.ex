@@ -8,7 +8,7 @@ defmodule ExTerm.Console.Update do
   are coming in.
   """
 
-  defstruct [:cursor, changes: []]
+  defstruct [:cursor, :insertion, changes: []]
 
   @type row_end :: {pos_integer, :end}
   @type cell_range :: {Console.location(), Console.location() | row_end}
@@ -22,11 +22,10 @@ defmodule ExTerm.Console.Update do
 
   @typedoc """
   ### fields
-
   - `cursor`:  nil if there is no change in the cursor location, new cursor
     `t:Console.location/0` otherwise.
-  - `last_cell`: nil if there is no change in the last cell of the console, new
-    last cell `t:Console.location/0` otherwise.
+  - `insertion`: nil if no rows have been inserted, a range if the insertion
+    has come about due to an `insert_iodata` instruction
   - `cells`: A list of changes to the console data.  This is a list of one of
     the following types
     - single `t:Console.location/0`.  This indicates a single location has
@@ -44,11 +43,11 @@ defmodule ExTerm.Console.Update do
     Note that the `cells` *should* be in reverse-sorted order, and *should* be
     compacted.
   """
-
   @type t :: %__MODULE__{
-          cursor: nil | Console.location(),
-          changes: cell_changes
-        }
+    cursor: nil | Console.location,
+    insertion: nil | Range.t,
+    changes: cell_changes
+  }
 
   @doc false
   def init do
@@ -144,6 +143,15 @@ defmodule ExTerm.Console.Update do
   def change_cursor(location) do
     get_current_update()
     |> Map.put(:cursor, location)
+    |> put_current_update()
+
+    :ok
+  end
+
+  @spec set_insertion(Range.t) :: :ok
+  def set_insertion(range) do
+    get_current_update()
+    |> Map.put(:insertion, range)
     |> put_current_update()
 
     :ok

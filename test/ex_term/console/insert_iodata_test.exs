@@ -34,7 +34,7 @@ defmodule ExTermTest.Console.InsertStringTest do
         Console.insert_iodata(console, "foo", 1)
       end
 
-      assert_receive %Update{changes: [{{1, 1}, :end}], cursor: {2, 1}}
+      assert_receive %Update{changes: [{{1, 1}, :end}], cursor: {2, 1}, insertion: 1..1}
 
       Helpers.transaction console, :access do
         assert %{char: "f"} = Console.get(console, {1, 1})
@@ -65,7 +65,7 @@ defmodule ExTermTest.Console.InsertStringTest do
         Console.insert_iodata(console, "foo", 2)
       end
 
-      assert_receive %Update{changes: [{{2, 1}, :end}], cursor: nil}
+      assert_receive %Update{changes: [{{2, 1}, :end}], cursor: nil, insertion: 2..2}
 
       Helpers.transaction console, :access do
         assert %{char: "f"} = Console.get(console, {2, 1})
@@ -95,7 +95,7 @@ defmodule ExTermTest.Console.InsertStringTest do
         Console.insert_iodata(console, "foobar", 1)
       end
 
-      assert_receive %Update{changes: [{{1, 1}, :end}], cursor: {3, 1}}
+      assert_receive %Update{changes: [{{1, 1}, :end}], cursor: {3, 1}, insertion: 1..2}
 
       Helpers.transaction console, :access do
         assert %{char: "f"} = Console.get(console, {1, 1})

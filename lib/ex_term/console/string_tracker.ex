@@ -99,10 +99,16 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   @spec insert_string_rows(t(), String.t()) :: t()
-  def insert_string_rows(tracker = %{mode: {:insert, _, _}, cursor: {row, _}}, string) do
+  def insert_string_rows(tracker = %{mode: {:insert, _, _}, cursor: {row, _}, layout: {_, columns}}, string) do
     # NB: don't cache the number of columns.  Row length should be fixed based
     # on the existing capacity of the column, so we have to check each time.
-    columns = Console.columns(tracker.console, row)
+
+    # for string row insertion, we're going to always add the row in to the cells
+    # buffer, because this will always be "in-order".
+    columns = case Console.columns(tracker.console, row) do
+      0 -> columns
+      other -> other
+    end
 
     case _blit_string_row(tracker, columns, string) do
       {new_tracker, leftover} ->
@@ -137,6 +143,8 @@ defmodule ExTerm.Console.StringTracker do
     tracker.console
     |> Console.insert(update_cells)
     |> Console.move_cursor(new_cursor)
+
+    Update.set_insertion(from_row..(from_row + count - 1))
 
     flush(tracker)
   end
