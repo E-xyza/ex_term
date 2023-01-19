@@ -295,9 +295,10 @@ defmodule ExTerm.Console do
     # the claim here is that everything after a given location must be broadcast.
     Update.register_cell_change(console, {{row, 1}, :end})
 
-    string = iodata
-    |> IO.iodata_to_binary()
-    |> String.replace_suffix("\n", "")
+    string =
+      iodata
+      |> IO.iodata_to_binary()
+      |> String.replace_suffix("\n", "")
 
     console
     |> StringTracker.new(row)

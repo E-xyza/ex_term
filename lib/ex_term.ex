@@ -185,15 +185,17 @@ defmodule ExTerm do
   end
 
   def handle_info(update = %Update{}, socket = %{assigns: %{console: console}}) do
-    cells = Helpers.transaction  console, :access do
-      Update.get(update, console)
-    end
+    cells =
+      Helpers.transaction console, :access do
+        Update.get(update, console)
+      end
 
-    new_socket = if cursor = update.cursor do
-      assign(socket, cells: cells, cursor: cursor)
-    else
-      assign(socket, cells: cells)
-    end
+    new_socket =
+      if cursor = update.cursor do
+        assign(socket, cells: cells, cursor: cursor)
+      else
+        assign(socket, cells: cells)
+      end
 
     {:noreply, new_socket}
   end

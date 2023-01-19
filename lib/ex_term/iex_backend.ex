@@ -106,6 +106,7 @@ defmodule ExTerm.IexBackend do
         Console.put_iodata(console, iodata)
       end
     end
+
     ExTerm.io_reply(from)
     {:noreply, state}
   end
