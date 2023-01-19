@@ -84,13 +84,11 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   @spec put_string_rows(t(), String.t()) :: t()
-  def put_string_rows(tracker = %{mode: :put}, string) do
+  def put_string_rows(tracker = %{mode: :put, cursor: {row, _}}, string) do
     # NB: don't cache the number of rows.  Row length should be fixed based on
     # the existing capacity of the column, so we have to check each time.
 
-    columns = columns_for_row(tracker)
-
-    case _blit_string_row(tracker, columns, string) do
+    case _blit_string_row(tracker, Console.columns(tracker.console, row), string) do
       # exhausted the row without finishing the string
       {updated_tracker, leftover} ->
         put_string_rows(updated_tracker, leftover)
@@ -101,11 +99,10 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   @spec insert_string_rows(t(), String.t()) :: t()
-  def insert_string_rows(tracker = %{mode: {:insert, _, _}}, string) do
+  def insert_string_rows(tracker = %{mode: {:insert, _, _}, cursor: {row, _}}, string) do
     # NB: don't cache the number of columns.  Row length should be fixed based
     # on the existing capacity of the column, so we have to check each time.
-
-    columns = columns_for_row(tracker)
+    columns = Console.columns(tracker.console, row)
 
     case _blit_string_row(tracker, columns, string) do
       {new_tracker, leftover} ->
@@ -113,14 +110,6 @@ defmodule ExTerm.Console.StringTracker do
 
       done ->
         hard_return(done, columns)
-    end
-  end
-
-  defp columns_for_row(%{console: console, cursor: {row, _}, layout: layout}) do
-    case Console.columns(console, row) do
-      # this row doesn't exist yet.
-      0 -> elem(layout, 1)
-      columns -> columns
     end
   end
 
@@ -149,32 +138,38 @@ defmodule ExTerm.Console.StringTracker do
     |> Console.insert(update_cells)
     |> Console.move_cursor(new_cursor)
 
-    tracker
+    flush(tracker)
   end
 
-  # if we are in put mode and trying to insert content on a row that doesn't
-  # exist yet, go ahead and put that row at the end of the console, but don't
-  # put this in the list of cells to update (this minimizes double-tap risk by
-  # ensuring that the act of creating the row is separated from the act of
-  # flushing data and we don't have to worry about the blank line overwriting
-  # later insertions with the same coordinate).
-  def _blit_string_row(
-        tracker = %{
-          cursor: {row, _column},
-          last_cell: {last_row, _},
-          layout: {_, layout_columns},
-          mode: :put
-        },
-        _,
-        string
-      )
-      when row === last_row + 1 do
-    Console.insert(tracker.console, Console.make_blank_row(row, layout_columns))
+  def flush_updates(tracker) do
+    tracker.console
+    |> Console.insert(tracker.cells)
+    |> Console.move_cursor(tracker.cursor)
+
+    flush(tracker)
+  end
+
+  defp flush(tracker) do
+    Update.merge(tracker.update)
+    %{tracker | cells: [], update: %Update{}, old_cursor: tracker.cursor}
+  end
+
+  def _blit_string_row(tracker = %{cursor: {row, column}}, columns, "")
+      when column === columns + 1 do
+    %{tracker | cursor: {row + 1, 1}}
+  end
+
+  def _blit_string_row(tracker, _, ""), do: tracker
+
+  def _blit_string_row(tracker = %{mode: :put, cursor: {row, _}, layout: {_, columns}}, 0, string) do
+    # since string MUST have a payload, obtain the layout columns and add that row in
+
+    new_cells = Enum.reduce(1..columns, tracker.cells, &[{{row, &1}, %Cell{}} | &2])
+    Console.insert(tracker.console, [{{row, columns + 1}, Cell.sentinel()} | new_cells])
 
     tracker
-    |> Map.replace!(:last_cell, {row, layout_columns})
-    |> Map.update!(:update, &Update.merge_into(&1, {{row, 1}, :end}))
-    |> _blit_string_row(layout_columns, string)
+    |> Map.replace!(:update, Update.merge_into(tracker.update, {{row, 1}, {row, :end}}))
+    |> _blit_string_row(columns, string)
   end
 
   def _blit_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string)
@@ -214,11 +209,9 @@ defmodule ExTerm.Console.StringTracker do
 
   def _blit_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string) do
     case String.next_grapheme(string) do
-      nil ->
-        tracker
-
       {grapheme, rest} ->
         new_cells = [{cursor, %Cell{char: grapheme, style: tracker.style}} | tracker.cells]
+
         new_update = Update.merge_into(tracker.update, cursor)
 
         tracker

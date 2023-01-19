@@ -266,7 +266,7 @@ defmodule ExTerm.Console do
           {{{row, col}, cell}, _} -> {{row + count, col}, cell}
         end)
 
-      {row, list} ->
+      {_, list} ->
         # last line gets copied over outright
         Enum.map(list, fn {{row, col}, cell} -> {{row + count, col}, cell} end)
     end)
@@ -346,7 +346,7 @@ defmodule ExTerm.Console do
       Update.change_cursor(new_cursor)
 
       console
-      |> Update.register_cell_change([new_cursor, old_cursor])
+      |> Update.register_cell_change(changes)
       |> put_metadata(:cursor, new_cursor)
     end
   end

@@ -17,190 +17,124 @@ defmodule ExTermTest.Console.PutStringTest do
   end
 
   describe "put_string/2" do
-    test "works when the string is contained in the row", %{console: console} do
+    test "works when nothing exists in the row and string is contained", %{console: console} do
       # note that the cursor starts at {1, 1}
       Helpers.transaction console, :mutate do
         Console.put_string(console, "foo")
+      end
 
-        assert_receive Console.update_msg(
-                         from: {1, 1},
-                         to: {1, 4},
-                         cursor: {1, 4},
-                         last_cell: {5, 5}
-                       )
+      assert_receive %{cursor: {1, 4}, changes: [{{1, 1}, {1, :end}}]}
 
+      Helpers.transaction console, :access do
         assert %{char: "f"} = Console.get(console, {1, 1})
         assert %{char: "o"} = Console.get(console, {1, 2})
         assert %{char: "o"} = Console.get(console, {1, 3})
         assert %{char: nil} = Console.get(console, {1, 4})
+        assert %{char: nil} = Console.get(console, {1, 5})
+        assert %{char: "\n"} = Console.get(console, {1, 6})
       end
     end
 
-    test "works when the string happens to be exactly the correct size of the console", %{
+    test "works when the row exists", %{console: console} do
+      # note that the cursor starts at {1, 1}
+      Helpers.transaction console, :mutate do
+        Console.new_row(console)
+      end
+
+      Helpers.transaction console, :mutate do
+        Console.put_string(console, "foo")
+      end
+
+      assert_receive %{cursor: {1, 4}, changes: [{{1, 1}, {1, 4}}]}
+
+      Helpers.transaction console, :access do
+        assert %{char: "f"} = Console.get(console, {1, 1})
+        assert %{char: "o"} = Console.get(console, {1, 2})
+        assert %{char: "o"} = Console.get(console, {1, 3})
+        assert %{char: nil} = Console.get(console, {1, 4})
+        assert %{char: nil} = Console.get(console, {1, 5})
+        assert %{char: "\n"} = Console.get(console, {1, 6})
+      end
+    end
+
+    test "works when nothing exists in the row and string is exactly the correct length", %{
       console: console
     } do
       # note that the cursor starts at {1, 1}
       Helpers.transaction console, :mutate do
-        Console.put_string(console, "quuxy")
-
-        assert_receive Console.update_msg(
-                         from: {1, 1},
-                         to: {2, 1},
-                         cursor: {2, 1},
-                         last_cell: {5, 5}
-                       )
-
-        assert %{char: "q"} = Console.get(console, {1, 1})
-        assert %{char: "u"} = Console.get(console, {1, 2})
-        assert %{char: "u"} = Console.get(console, {1, 3})
-        assert %{char: "x"} = Console.get(console, {1, 4})
-        assert %{char: "y"} = Console.get(console, {1, 5})
-        assert %{char: nil} = Console.get(console, {2, 1})
+        Console.put_string(console, "fooba")
       end
-    end
 
-    test "works when the string overflows a line", %{console: console} do
-      # note that the cursor starts at {1, 1}
-      Helpers.transaction console, :mutate do
-        Console.put_string(console, "foobar")
+      assert_receive %{cursor: {2, 1}, changes: [{{1, 1}, {1, :end}}]}
 
-        assert_receive Console.update_msg(
-                         from: {1, 1},
-                         to: {2, 2},
-                         cursor: {2, 2},
-                         last_cell: {5, 5}
-                       )
-
+      Helpers.transaction console, :access do
         assert %{char: "f"} = Console.get(console, {1, 1})
         assert %{char: "o"} = Console.get(console, {1, 2})
         assert %{char: "o"} = Console.get(console, {1, 3})
         assert %{char: "b"} = Console.get(console, {1, 4})
         assert %{char: "a"} = Console.get(console, {1, 5})
-        assert %{char: "r"} = Console.get(console, {2, 1})
-        assert %{char: nil} = Console.get(console, {2, 2})
+        assert %{char: "\n"} = Console.get(console, {1, 6})
+
+        refute Console.get(console, {2, 1})
       end
     end
 
-    test "puts in a new line when the string overflows the console", %{console: console} do
+    test "works when nothing exists in the row and string overflows", %{console: console} do
+      # note that the cursor starts at {1, 1}
       Helpers.transaction console, :mutate do
-        Console.move_cursor(console, {5, 1})
-
         Console.put_string(console, "foobar")
+      end
 
-        assert_receive Console.update_msg(
-                         from: {5, 1},
-                         to: {6, 2},
-                         cursor: {6, 2},
-                         last_cell: {6, 5}
-                       )
+      assert_receive %{cursor: {2, 2}, changes: [{{1, 1}, {2, :end}}]}
 
-        assert %{char: "f"} = Console.get(console, {5, 1})
-        assert %{char: "o"} = Console.get(console, {5, 2})
-        assert %{char: "o"} = Console.get(console, {5, 3})
-        assert %{char: "b"} = Console.get(console, {5, 4})
-        assert %{char: "a"} = Console.get(console, {5, 5})
-        assert %{char: "r"} = Console.get(console, {6, 1})
+      Helpers.transaction console, :access do
+        assert %{char: "f"} = Console.get(console, {1, 1})
+        assert %{char: "o"} = Console.get(console, {1, 2})
+        assert %{char: "o"} = Console.get(console, {1, 3})
+        assert %{char: "b"} = Console.get(console, {1, 4})
+        assert %{char: "a"} = Console.get(console, {1, 5})
+        assert %{char: "\n"} = Console.get(console, {1, 6})
+        assert %{char: "r"} = Console.get(console, {2, 1})
+        assert %{char: nil} = Console.get(console, {2, 5})
+        assert %{char: "\n"} = Console.get(console, {2, 6})
+        refute Console.get(console, {3, 1})
+      end
+    end
 
-        for index <- 2..5 do
-          assert %{char: nil} = Console.get(console, {6, index})
+    for return <- ["\n", "\r", "\r\n"] do
+      test "works when hard return (#{return}) causes string overflow", %{console: console} do
+        # note that the cursor starts at {1, 1}
+        Helpers.transaction console, :mutate do
+          Console.put_string(console, "foo#{unquote(return)}bar")
         end
 
-        assert %{char: "\n"} = Console.get(console, {6, 6})
-      end
-    end
+        assert_receive %{cursor: {2, 4}, changes: [{{1, 1}, {2, :end}}]}
 
-    test "works when a new line pushes it over the edge", %{console: console} do
-      Helpers.transaction console, :mutate do
-        Console.move_cursor(console, {5, 1})
-
-        Console.put_string(console, "\n\na")
-
-        assert_receive Console.update_msg(
-                         from: {6, 1},
-                         to: {7, 2},
-                         cursor: {7, 2},
-                         last_cell: {7, 5}
-                       )
-
-        for index <- 1..5 do
-          assert %{char: nil} = Console.get(console, {5, index})
-          assert %{char: nil} = Console.get(console, {6, index})
+        Helpers.transaction console, :access do
+          assert %{char: "f"} = Console.get(console, {1, 1})
+          assert %{char: "o"} = Console.get(console, {1, 2})
+          assert %{char: "o"} = Console.get(console, {1, 3})
+          assert %{char: nil} = Console.get(console, {1, 4})
+          assert %{char: nil} = Console.get(console, {1, 5})
+          assert %{char: "\n"} = Console.get(console, {1, 6})
+          assert %{char: "b"} = Console.get(console, {2, 1})
+          assert %{char: "a"} = Console.get(console, {2, 2})
+          assert %{char: "r"} = Console.get(console, {2, 3})
+          assert %{char: nil} = Console.get(console, {2, 5})
+          assert %{char: "\n"} = Console.get(console, {2, 6})
+          refute Console.get(console, {3, 1})
         end
-
-        assert %{char: "\n"} = Console.get(console, {5, 6})
-        assert %{char: "\n"} = Console.get(console, {6, 6})
-        assert %{char: "\n"} = Console.get(console, {7, 6})
-
-        assert {7, 2} = Console.cursor(console)
-      end
-    end
-  end
-
-  describe "put_string with an intervening special actions" do
-    test "lf bumps the line", %{console: console} do
-      Helpers.transaction console, :mutate do
-        Console.put_string(console, "f\noo")
-
-        assert_receive Console.update_msg(
-                         from: {1, 1},
-                         to: {1, 1},
-                         cursor: {2, 1},
-                         last_cell: {5, 5}
-                       )
-
-        # note that since the cursor moved to this point
-        # it's gonna be in the update.
-        assert_receive Console.update_msg(
-                         from: {2, 1},
-                         to: {2, 3},
-                         cursor: {2, 3},
-                         last_cell: {5, 5}
-                       )
-
-        assert %{char: "f"} = Console.get(console, {1, 1})
-        assert %{char: "o"} = Console.get(console, {2, 1})
-        assert %{char: "o"} = Console.get(console, {2, 2})
-      end
-    end
-
-    test "crlf bumps the line", %{console: console} do
-      Helpers.transaction console, :mutate do
-        Console.put_string(console, "f\r\noo")
-
-        assert_receive Console.update_msg(
-                         from: {1, 1},
-                         to: {1, 1},
-                         cursor: {2, 1},
-                         last_cell: {5, 5}
-                       )
-
-        # note that since the cursor moved to this point
-        # it's gonna be in the update.
-        assert_receive Console.update_msg(
-                         from: {2, 1},
-                         to: {2, 3},
-                         cursor: {2, 3},
-                         last_cell: {5, 5}
-                       )
-
-        assert %{char: "f"} = Console.get(console, {1, 1})
-        assert %{char: nil} = Console.get(console, {1, 2})
-        assert %{char: "o"} = Console.get(console, {2, 1})
-        assert %{char: "o"} = Console.get(console, {2, 2})
       end
     end
 
     test "ANSI code can change the style", %{console: console} do
       Helpers.transaction console, :mutate do
         Console.put_string(console, "f" <> IO.ANSI.red() <> "oo")
+      end
 
-        assert_receive Console.update_msg(
-                         from: {1, 1},
-                         to: {1, 4},
-                         cursor: {1, 4},
-                         last_cell: {5, 5}
-                       )
+      assert_receive %{cursor: {1, 4}, changes: [{{1, 1}, {1, :end}}]}
 
+      Helpers.transaction console, :access do
         assert %{char: "f", style: %{color: nil}} = Console.get(console, {1, 1})
         assert %{char: "o", style: %{color: :red}} = Console.get(console, {1, 2})
         assert %{char: "o", style: %{color: :red}} = Console.get(console, {1, 3})

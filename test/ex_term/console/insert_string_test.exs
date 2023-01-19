@@ -95,7 +95,7 @@ defmodule ExTermTest.Console.InsertStringTest do
         Console.insert_string(console, "foobar", 1)
       end
 
-      # assert_receive %Update{changes: [{{1, 1}, :end}], cursor: {3, 1}}
+      assert_receive %Update{changes: [{{1, 1}, :end}], cursor: {3, 1}}
 
       Helpers.transaction console, :access do
         assert %{char: "f"} = Console.get(console, {1, 1})
