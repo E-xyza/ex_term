@@ -3,6 +3,7 @@ defmodule ExTerm.IexBackend.Prompt do
 
   alias ExTerm.Console
   alias ExTerm.Console.Helpers
+  alias ExTerm.IOServer
 
   require Helpers
 
@@ -62,7 +63,7 @@ defmodule ExTerm.IexBackend.Prompt do
       |> Console.put_iodata(full_content)
     end
 
-    ExTerm.io_reply(prompt.reply, full_content)
+    IOServer.reply(prompt.reply, full_content)
     nil
   end
 

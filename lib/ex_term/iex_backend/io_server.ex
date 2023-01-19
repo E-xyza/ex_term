@@ -44,7 +44,6 @@ defmodule ExTerm.IexBackend.IOServer do
   @impl GenServer
   def init(opts) do
     backend = self()
-    opts |> dbg(limit: 25)
 
     # TODO: move this to tasksupervisor
 

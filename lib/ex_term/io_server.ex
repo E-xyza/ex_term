@@ -177,6 +177,9 @@ defmodule ExTerm.IOServer do
   defp to_genserver_info(result, from, should_send) do
     {result, reply} =
       case result do
+        {:ok, reply, new_state} ->
+          {{:noreply, new_state}, {:ok, reply}}
+
         {:ok, new_state} ->
           {{:noreply, new_state}, :ok}
 
