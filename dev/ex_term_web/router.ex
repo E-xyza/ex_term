@@ -1,5 +1,6 @@
 defmodule ExTermWeb.Router do
   use ExTermWeb, :router
+  import ExTerm.Router
 
   pipeline :browser do
     plug :accepts, ["html"]
@@ -17,6 +18,6 @@ defmodule ExTermWeb.Router do
   scope "/" do
     pipe_through :browser
 
-    live "/", ExTerm
+    live_term "/", pubsub_server: ExTerm.PubSub
   end
 end

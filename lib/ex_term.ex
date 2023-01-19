@@ -88,10 +88,10 @@ defmodule ExTerm do
   # TODO: modularize this.
   @backend ExTerm.IexBackend
 
-  def mount(params, session, socket) do
+  def mount(params, session = %{"exterm-backend" => {backend, _}}, socket) do
     if connected?(socket) do
-      case @backend.mount(params, session, socket) do
-        {:ok, identifier, console} ->
+      case backend.on_connect(params, session, socket) do
+        {:ok, console, socket} ->
           # obtain the layout and dump the whole layout.
           {rows, columns} =
             Helpers.transaction console, :access do
@@ -109,7 +109,7 @@ defmodule ExTerm do
           new_socket =
             socket
             |> init(console)
-            |> assign(backend: @backend, identifier: identifier, cells: cells)
+            |> assign(backend: backend, cells: cells)
 
           {:ok, new_socket, temporary_assigns: [cells: []]}
       end
@@ -156,32 +156,32 @@ defmodule ExTerm do
 
   # handlers
 
-  def handle_event("focus", payload, socket) do
-    dispatch(:handle_focus, [], socket)
+  def handle_event("focus", _payload, socket) do
+    socket
+    |> set_focus(true)
+    |> socket.assigns.backend.on_focus()
   end
 
-  def handle_event("blur", payload, socket) do
-    dispatch(:handle_blur, [], socket)
+  def handle_event("blur", _payload, socket) do
+    socket
+    |> set_focus(false)
+    |> socket.assigns.backend.on_blur()
   end
 
   def handle_event("keydown", %{"key" => key}, socket) do
-    dispatch(:handle_keydown, key, socket)
+    socket.assigns.backend.on_keydown(key, socket)
   end
 
   def handle_event("keyup", %{"key" => key}, socket) do
-    dispatch(:handle_keyup, key, socket)
+    socket.assigns.backend.on_keyup(key, socket)
   end
 
   def handle_event("paste", %{"paste" => string}, socket) do
-    dispatch(:handle_paste, string, socket)
+    socket.assigns.backend.on_paste(string, socket)
   end
 
   def handle_event(type, payload, socket) do
-    dispatch(:handle_event, [type, payload], socket)
-  end
-
-  def handle_info({:io_request, pid, ref, request}, socket) do
-    dispatch(:handle_io_request, [{pid, ref}, request], socket)
+    socket.assigns.backend.handle_event(type, payload, socket)
   end
 
   def handle_info(update = %Update{}, socket = %{assigns: %{console: console}}) do
@@ -203,30 +203,4 @@ defmodule ExTerm do
   def handle_info({:prompt, activity}, socket) when activity in [:active, :inactive] do
     {:noreply, set_prompt(socket, activity === :active)}
   end
-
-  defp dispatch(what, payload, socket = %{assigns: %{backend: backend, identifier: identifier}}) do
-    case apply(backend, what, [identifier | List.wrap(payload)]) do
-      :ok ->
-        {:noreply, socket}
-
-      {:ok, update = %Update{}} ->
-        dispatch(:handle_update, [update], socket)
-
-      {:ok, assigns} ->
-        {:noreply, assign(socket, assigns)}
-    end
-  end
-
-  ### TOOLS
-  @doc """
-  sends a reply to server that implements erlang's io protocol.
-
-  The form of this reply is `{:io_reply, ref, reply}`.  By default, `reply` will
-  be the atom `:ok`.
-
-  See:
-
-  https://www.erlang.org/doc/apps/stdlib/io_protocol.html
-  """
-  def io_reply({pid, ref}, reply \\ :ok), do: send(pid, {:io_reply, ref, reply})
 end
