@@ -1,0 +1,80 @@
+:root {
+    --exterm-black: black;
+    --exterm-red: white;
+    --exterm-green: white;
+    --exterm-yellow: white;
+    --exterm-blue: white;
+    --exterm-magenta: white;
+    --exterm-cyan: white;
+    --exterm-white: white;
+}
+
+div.exterm-focused {
+    border-style: solid;
+    border-color: yellow;
+    border-width: 4px;
+}
+
+div.exterm-blurred {
+    border-style: solid;
+    border-color: black;
+    border-width: 4px;
+}
+
+div#exterm-terminal {
+    background-color: black;
+    color: white;
+    font-family: courier-new, courier, monospace;
+    font-size: 15px;
+    width: 100ch;
+    height: 583px;
+    position: relative;
+    overflow-y: scroll;
+    caret-color: transparent;
+}
+
+div#exterm-console {
+    overflow-anchor: none;
+}
+
+span.exterm-cell {
+    overflow-anchor: none;
+}
+
+div#exterm-anchor {
+    overflow-anchor: auto;
+    position: relative;
+    height: 1px;
+}
+
+div.exterm.exterm-blurred span.exterm-cursor-active {
+    border-color: white;
+    border-width: 1px;
+    border-style: solid;
+}
+
+div.exterm.exterm-focused span.exterm-cursor-active {
+    animation: blinker 1s linear infinite;
+}
+
+span.exterm-cell {
+    height: 20px;
+}
+
+span.exterm-cell-sentinel {
+    white-space: pre;
+}
+
+span.exterm-cell-space {
+    white-space: pre;
+}
+
+span.exterm-cell-blank {
+    white-space: pre;
+}
+
+@keyframes blinker {
+    50% {
+        background-color: white;
+    }
+}

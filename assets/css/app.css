@@ -1,6 +1,5 @@
 /* This file is for your main application CSS */
 @import "./phoenix.css";
-@import "../../lib/css/default.css";
 
 /* Alerts and form errors used by phx.new */
 .alert {
