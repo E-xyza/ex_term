@@ -146,52 +146,79 @@ defmodule ExTerm.IexBackend.IOServer do
   def on_blur(_server), do: :ok
   def on_event(_server, _type, _payload), do: :ok
 
-  def on_keydown(server, key), do: GenServer.call(server, {:on_keydown, key})
+  def on_keydown(server, key), do: GenServer.cast(server, {:on_keydown, key})
 
-  defp on_keydown_impl(key, _from, state = %{prompt: prompt}) do
+  defp on_keydown_impl(key, state = %{prompt: prompt}) do
     case String.next_grapheme(key) do
       {^key, ""} when is_nil(prompt) ->
-        {:reply, :ok, %{state | buffer: KeyBuffer.push(state.buffer, key)}}
+        {:noreply, %{state | buffer: KeyBuffer.push(state.buffer, key)}}
 
       {^key, ""} ->
-        {:reply, :ok, %{state | prompt: Prompt.push(prompt, key)}}
+        {:noreply, %{state | prompt: Prompt.push(prompt, key)}}
 
       _ ->
         special_keydown(key, state)
     end
   end
 
-  defp special_keydown("Enter", state) do
+  defp special_keydown("Enter", state = %{prompt: prompt}) do
     new_state =
-      if state.prompt do
+      if prompt do
+        content =
+          prompt.precursor
+          |> Enum.reverse(prompt.postcursor)
+          |> IO.iodata_to_binary()
+
         state
-        |> History.commit()
+        |> Map.update!(:history, &History.commit(&1, content))
         |> Map.update!(:prompt, &Prompt.submit/1)
       else
         %{state | buffer: KeyBuffer.push(state.buffer, "Enter")}
       end
 
-    {:reply, :ok, new_state}
+    {:noreply, new_state}
   end
 
   defp special_keydown("Backspace", state) do
-    {:reply, :ok, %{state | prompt: Prompt.backspace(state.prompt)}}
+    {:noreply, Map.update!(state, :prompt, &Prompt.backspace/1)}
   end
 
   defp special_keydown("ArrowLeft", state) do
-    {:reply, :ok, %{state | prompt: Prompt.left(state.prompt)}}
+    {:noreply, Map.update!(state, :prompt, &Prompt.left/1)}
   end
 
   defp special_keydown("ArrowRight", state) do
-    {:reply, :ok, %{state | prompt: Prompt.right(state.prompt)}}
+    {:noreply, Map.update!(state, :prompt, &Prompt.right/1)}
   end
 
   defp special_keydown("ArrowUp", state) do
-    {:reply, :ok, History.up(state)}
+    prompt_content = state.prompt
+    |> Prompt.content()
+    |> String.replace_suffix("\n", "")
+
+    new_state = case History.up(state.history, prompt_content) do
+      {new_history, new_prompt} ->
+        state
+        |> Map.replace!(:history, new_history)
+        |> Map.update!(:prompt, &Prompt.substitute(&1, new_prompt))
+      nil -> state
+    end
+    {:noreply, new_state}
   end
 
   defp special_keydown("ArrowDown", state) do
-    {:reply, :ok, History.down(state)}
+    prompt_content = state.prompt
+    |> Prompt.content()
+    |> String.replace_suffix("\n", "")
+
+    new_state = case History.down(state.history, prompt_content) do
+      {new_history, new_prompt} ->
+        state
+        |> Map.replace!(:history, new_history)
+        |> Map.update!(:prompt, &Prompt.substitute(&1, new_prompt))
+      nil -> state
+    end
+    {:noreply, new_state}
   end
 
   defp special_keydown(
@@ -232,31 +259,31 @@ defmodule ExTerm.IexBackend.IOServer do
           {new_prompt, row}
       end
 
-    {:reply, :ok, %{state | prompt: %{new_prompt | location: {new_row, column}}}}
+    {:noreply, %{state | prompt: %{new_prompt | location: {new_row, column}}}}
   end
 
   @flagkeys ~w(Alt AltGraph CapsLock Control Fn Hyper Meta Shift Super Symbol)
 
   defp special_keydown(key, state) when key in @flagkeys do
-    {:reply, :ok, %{state | flags: MapSet.put(state.flags, key)}}
+    {:noreply, %{state | flags: MapSet.put(state.flags, key)}}
   end
 
-  defp special_keydown(_, state), do: {:reply, :ok, state}
+  defp special_keydown(_, state), do: {:noreply, state}
 
-  def on_keyup(server, key), do: GenServer.call(server, {:on_keyup, key})
+  def on_keyup(server, key), do: GenServer.cast(server, {:on_keyup, key})
 
-  defp on_keyup_impl(key, _from, state) when key in @flagkeys do
-    {:reply, :ok, %{state | flags: MapSet.delete(state.flags, key)}}
+  defp on_keyup_impl(key, state) when key in @flagkeys do
+    {:noreply, %{state | flags: MapSet.delete(state.flags, key)}}
   end
 
-  defp on_keyup_impl(_key, _from, state) do
-    {:reply, :ok, state}
+  defp on_keyup_impl(_key, state) do
+    {:noreply, state}
   end
 
-  def on_paste(server, string), do: GenServer.call(server, {:on_paste, string})
+  def on_paste(server, string), do: GenServer.cast(server, {:on_paste, string})
 
-  defp on_paste_impl(string, _from, state) do
-    {:reply, :ok, %{state | prompt: Prompt.paste(state.prompt, string)}}
+  defp on_paste_impl(string, state) do
+    {:norepply, %{state | prompt: Prompt.paste(state.prompt, string)}}
   end
 
   ### UTILITIES
@@ -278,7 +305,7 @@ defmodule ExTerm.IexBackend.IOServer do
   # GENSERVER ROUTER
   @impl GenServer
   def handle_call(:console, from, state), do: console_impl(from, state)
-  def handle_call({:on_keydown, key}, from, state), do: on_keydown_impl(key, from, state)
-  def handle_call({:on_keyup, key}, from, state), do: on_keyup_impl(key, from, state)
-  def handle_call({:on_paste, string}, from, state), do: on_paste_impl(string, from, state)
+  def handle_cast({:on_keydown, key}, state), do: on_keydown_impl(key, state)
+  def handle_cast({:on_keyup, key}, state), do: on_keyup_impl(key, state)
+  def handle_cast({:on_paste, string}, state), do: on_paste_impl(string, state)
 end
