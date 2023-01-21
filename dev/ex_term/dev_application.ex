@@ -8,7 +8,8 @@ defmodule ExTerm.DevApplication do
     children = [
       {Phoenix.PubSub, name: ExTerm.PubSub},
       ExTermWeb.Endpoint
-    ]
+    ] ++ ExTerm.Application.children()
+    
     opts = [strategy: :one_for_one, name: ExTerm.Supervisor]
     Supervisor.start_link(children, opts)
   end

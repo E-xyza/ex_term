@@ -92,9 +92,10 @@ defmodule ExTerm.IexBackend.Prompt do
     before_length = length(prompt.precursor)
     after_length = String.length(substitution)
 
-    extras = if after_length < before_length do
-      String.duplicate(" ", before_length - after_length)
-    end
+    extras =
+      if after_length < before_length do
+        String.duplicate(" ", before_length - after_length)
+      end
 
     precursor = breakdown(substitution)
     paint(%{prompt | precursor: precursor}, extras)

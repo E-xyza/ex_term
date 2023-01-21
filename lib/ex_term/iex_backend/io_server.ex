@@ -17,6 +17,7 @@ defmodule ExTerm.IexBackend.IOServer do
   alias ExTerm.IexBackend.History
   alias ExTerm.IexBackend.KeyBuffer
   alias ExTerm.IexBackend.Prompt
+  alias ExTerm.TerminalSupervisor
 
   require Helpers
 
@@ -43,19 +44,11 @@ defmodule ExTerm.IexBackend.IOServer do
 
   @impl GenServer
   def init(opts) do
-    backend = self()
-
-    # TODO: move this to tasksupervisor
-
-    {:ok, shell} =
-      Task.start_link(fn ->
-        :erlang.group_leader(backend, self())
-        IEx.Server.run([])
-      end)
-
     pubsub_server = Keyword.fetch!(opts, :pubsub_server)
     pubsub_topic = pubsub_topic(self())
     console = Console.new(handle_update: &broadcast_update(&1, pubsub_server, pubsub_topic))
+
+    {:ok, shell} = TerminalSupervisor.start_child(fn -> IEx.Server.run([]) end)
 
     {:ok,
      %__MODULE__{
@@ -192,32 +185,42 @@ defmodule ExTerm.IexBackend.IOServer do
   end
 
   defp special_keydown("ArrowUp", state) do
-    prompt_content = state.prompt
-    |> Prompt.content()
-    |> String.replace_suffix("\n", "")
+    prompt_content =
+      state.prompt
+      |> Prompt.content()
+      |> String.replace_suffix("\n", "")
 
-    new_state = case History.up(state.history, prompt_content) do
-      {new_history, new_prompt} ->
-        state
-        |> Map.replace!(:history, new_history)
-        |> Map.update!(:prompt, &Prompt.substitute(&1, new_prompt))
-      nil -> state
-    end
+    new_state =
+      case History.up(state.history, prompt_content) do
+        {new_history, new_prompt} ->
+          state
+          |> Map.replace!(:history, new_history)
+          |> Map.update!(:prompt, &Prompt.substitute(&1, new_prompt))
+
+        nil ->
+          state
+      end
+
     {:noreply, new_state}
   end
 
   defp special_keydown("ArrowDown", state) do
-    prompt_content = state.prompt
-    |> Prompt.content()
-    |> String.replace_suffix("\n", "")
+    prompt_content =
+      state.prompt
+      |> Prompt.content()
+      |> String.replace_suffix("\n", "")
 
-    new_state = case History.down(state.history, prompt_content) do
-      {new_history, new_prompt} ->
-        state
-        |> Map.replace!(:history, new_history)
-        |> Map.update!(:prompt, &Prompt.substitute(&1, new_prompt))
-      nil -> state
-    end
+    new_state =
+      case History.down(state.history, prompt_content) do
+        {new_history, new_prompt} ->
+          state
+          |> Map.replace!(:history, new_history)
+          |> Map.update!(:prompt, &Prompt.substitute(&1, new_prompt))
+
+        nil ->
+          state
+      end
+
     {:noreply, new_state}
   end
 
