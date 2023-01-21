@@ -80,7 +80,7 @@ defmodule ExTerm do
   # TODO: modularize this.
   @backend ExTerm.IexBackend
 
-  def mount(params, session = %{"exterm-backend" => {backend, _}}, socket) do
+  def mount(params, session = %{"exterm-backend" => {backend, opts}}, socket) do
     if connected?(socket) do
       case backend.on_connect(params, session, socket) do
         {:ok, console, socket} ->
@@ -98,10 +98,22 @@ defmodule ExTerm do
               {{row, column}, %Cell{char: if(column === sentinel_column, do: "\n")}}
             end
 
+          css =
+            case Keyword.fetch(opts, :css) do
+              :error ->
+                true
+
+              {:ok, {:file, file}} ->
+                File.read!(file)
+
+              {:ok, content} when is_binary(content) ->
+                content
+            end
+
           new_socket =
             socket
             |> init(console)
-            |> assign(backend: backend, cells: cells)
+            |> assign(backend: backend, cells: cells, css: css)
 
           {:ok, new_socket, temporary_assigns: [cells: []]}
       end
