@@ -1,7 +1,7 @@
 defmodule ExTerm.TerminalSupervisor do
   def start_link(opts), do: Task.Supervisor.start_link(opts ++ [name: __MODULE__])
 
-  #defdelegate child_spec(params), to: Task.Supervisor
+  # defdelegate child_spec(params), to: Task.Supervisor
 
   def child_spec(params) do
     %{
@@ -19,6 +19,7 @@ defmodule ExTerm.TerminalSupervisor do
     wrapped = fn ->
       Process.link(group_leader)
       :erlang.group_leader(group_leader, self())
+
       case task do
         {m, f, a} -> apply(m, f, a)
         task when is_function(task, 0) -> task.()

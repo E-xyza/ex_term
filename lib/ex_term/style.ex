@@ -148,7 +148,7 @@ defmodule ExTerm.Style do
   end
 
   defp kv_to_css(key, value) do
-    List.wrap(if value, do: [[to_string(key), ":", to_string(value), ";"]])
+    List.wrap(if value, do: [[to_string(key), ":var(--exterm-", to_string(value), ");"]])
   end
 
   def from_css(css) do

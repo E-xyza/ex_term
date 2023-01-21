@@ -21,16 +21,7 @@ defmodule ExTerm do
   end
   ```
 
-  2. Connect the ex_term CSS:
-    - if you're using a css bundler, add to your "app.css" (or other css file in your assets directory)
-
-      ```css
-      @import "../../deps/ex_term/lib/css/default.css";
-      ```
-
-    - you may need a different strategy if you aren't using a css bundler.
-
-  3. Create a live view in your routes
+  2. Create a live view in your routes
     - as a standalone liveview
 
       ```elixir
@@ -78,6 +69,7 @@ defmodule ExTerm do
     <div id="exterm-paste-target" phx-click="paste"/>
 
     <ExTerm.JS.render/>
+    <ExTerm.CSS.render css={@css}/>
     """
   end
 
@@ -88,7 +80,7 @@ defmodule ExTerm do
   # TODO: modularize this.
   @backend ExTerm.IexBackend
 
-  def mount(params, session = %{"exterm-backend" => {backend, _}}, socket) do
+  def mount(params, session = %{"exterm-backend" => {backend, opts}}, socket) do
     if connected?(socket) do
       case backend.on_connect(params, session, socket) do
         {:ok, console, socket} ->
@@ -106,10 +98,22 @@ defmodule ExTerm do
               {{row, column}, %Cell{char: if(column === sentinel_column, do: "\n")}}
             end
 
+          css =
+            case Keyword.fetch(opts, :css) do
+              :error ->
+                true
+
+              {:ok, {:file, file}} ->
+                File.read!(file)
+
+              {:ok, content} when is_binary(content) ->
+                content
+            end
+
           new_socket =
             socket
             |> init(console)
-            |> assign(backend: backend, cells: cells)
+            |> assign(backend: backend, cells: cells, css: css)
 
           {:ok, new_socket, temporary_assigns: [cells: []]}
       end
@@ -125,6 +129,7 @@ defmodule ExTerm do
     |> set_focus
     |> set_prompt
     |> set_console(console)
+    |> set_css(true)
   end
 
   defp set_cursor(socket, cursor \\ {1, 1}) do
@@ -152,6 +157,10 @@ defmodule ExTerm do
 
   defp set_console(socket, console) do
     assign(socket, console: console)
+  end
+
+  defp set_css(socket, css) do
+    assign(socket, css: css)
   end
 
   # handlers
