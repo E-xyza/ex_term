@@ -51,19 +51,22 @@ defmodule ExTerm.IexBackend.Prompt do
     paint(%{prompt | postcursor: tl(postcursor), precursor: [hd(postcursor) | prompt.precursor]})
   end
 
+  def content(prompt) do
+    prompt.precursor
+    |> Enum.reverse([prompt.postcursor, "\n"])
+    |> IO.iodata_to_binary()
+  end
+
   def submit(prompt = %{console: console}) do
-    full_content =
-      prompt.precursor
-      |> Enum.reverse([prompt.postcursor, "\n"])
-      |> IO.iodata_to_binary()
+    content = content(prompt)
 
     Helpers.transaction console, :mutate do
       console
       |> Console.move_cursor(prompt.location)
-      |> Console.put_iodata(full_content)
+      |> Console.put_iodata(content)
     end
 
-    IOServer.reply(prompt.reply, full_content)
+    IOServer.reply(prompt.reply, content)
     nil
   end
 
@@ -86,8 +89,15 @@ defmodule ExTerm.IexBackend.Prompt do
   end
 
   def substitute(prompt, substitution) do
+    before_length = length(prompt.precursor)
+    after_length = String.length(substitution)
+
+    extras = if after_length < before_length do
+      String.duplicate(" ", before_length - after_length)
+    end
+
     precursor = breakdown(substitution)
-    paint(%{prompt | precursor: precursor})
+    paint(%{prompt | precursor: precursor}, extras)
   end
 
   def bump_prompt(prompt = %{location: {row, column}}, start..finish) do
