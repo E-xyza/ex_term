@@ -12,7 +12,7 @@ defmodule ExTerm.IexBackend do
     # TODO: move this to supervising it with a  DynamicSupervisor
     io_server = Keyword.get(opts, :io_server, ExTerm.IexBackend.IOServer)
 
-    {:ok, pid} = io_server.start_link(opts)
+    {:ok, pid} = DynamicSupervisor.start_child(ExTerm.BackendSupervisor, {io_server, opts})
 
     pubsub_server = Keyword.fetch!(opts, :pubsub_server)
     pubsub_topic = io_server.pubsub_topic(pid)

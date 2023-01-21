@@ -6,7 +6,7 @@ defmodule ExTerm.IexBackend.History do
 
   def new, do: {[], []}
 
-  @spec up(t, String.t | nil) :: nil | {t, String.t}
+  @spec up(t, String.t() | nil) :: nil | {t, String.t()}
 
   def up({[], _}, _prompt), do: nil
 
@@ -14,14 +14,14 @@ defmodule ExTerm.IexBackend.History do
 
   def up({[this | past], future}, _prompt), do: {{past, [this | future]}, this}
 
-  @spec down(t, String.t | nil) :: nil | {t, String.t}
+  @spec down(t, String.t() | nil) :: nil | {t, String.t()}
   def down({_, []}, _prompt), do: nil
 
   def down({[], [this | future]}, this), do: down({[this], future}, nil)
 
   def down({past, [this | future]}, _prompt), do: {{[this | past], future}, this}
 
-  @spec commit(t, String.t) :: t
+  @spec commit(t, String.t()) :: t
   def commit({past, future}, content) do
     new_past =
       future
