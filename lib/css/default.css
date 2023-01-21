@@ -1,3 +1,14 @@
+:root {
+    --exterm-black: black;
+    --exterm-red: red;
+    --exterm-green: green;
+    --exterm-yellow: yellow;
+    --exterm-blue: blue;
+    --exterm-magenta: magenta;
+    --exterm-cyan: cyan;
+    --exterm-white: white;
+}
+
 div.exterm-focused {
     border-style: solid;
     border-color: yellow;
