@@ -69,7 +69,7 @@ defmodule ExTerm do
     <div id="exterm-paste-target" phx-click="paste"/>
 
     <ExTerm.JS.render/>
-    <ExTerm.CSS.render/>
+    <ExTerm.CSS.render css={@css}/>
     """
   end
 
@@ -117,6 +117,7 @@ defmodule ExTerm do
     |> set_focus
     |> set_prompt
     |> set_console(console)
+    |> set_css(true)
   end
 
   defp set_cursor(socket, cursor \\ {1, 1}) do
@@ -144,6 +145,10 @@ defmodule ExTerm do
 
   defp set_console(socket, console) do
     assign(socket, console: console)
+  end
+
+  defp set_css(socket, css) do
+    assign(socket, css: css)
   end
 
   # handlers

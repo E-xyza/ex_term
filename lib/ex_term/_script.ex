@@ -26,7 +26,13 @@ defmodule ExTerm.CSS do
   @css File.read!(@exterm_css)
 
   def render(assigns) do
-    assigns = %{css: Map.get(assigns, :css, @css)}
+    css = case Map.fetch(assigns, :css) |> dbg(limit: 25) do
+      {:ok, true} -> @css
+      {:ok, css} -> css
+      _ -> ""
+    end
+
+    assigns = %{css: css}
 
     ~H"""
     <style>
