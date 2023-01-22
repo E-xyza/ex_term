@@ -23,6 +23,7 @@ defmodule ExTerm.TerminalSupervisor do
       case task do
         {m, f, a} ->
           apply(m, f, a)
+
         task when is_function(task, 0) ->
           task.()
       end

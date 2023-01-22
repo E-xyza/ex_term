@@ -8,7 +8,10 @@ defmodule ExTermTest.Console do
     ref = make_ref()
 
     send(test_pid, {:block, self(), ref})
-    receive do {:unblock, ^ref} -> :ok end
+
+    receive do
+      {:unblock, ^ref} -> :ok
+    end
   end
 
   @doc """

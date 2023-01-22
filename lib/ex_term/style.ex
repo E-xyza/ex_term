@@ -2,7 +2,7 @@ defmodule ExTerm.Style do
   @moduledoc false
   defstruct [
     :color,
-    :bgcolor,
+    :"background-color",
     :blink,
     :frame,
     :intensity,
@@ -27,7 +27,7 @@ defmodule ExTerm.Style do
   @type color :: unquote(quoted_color_type)
   @type t :: %__MODULE__{
           color: nil | color | String.t(),
-          bgcolor: nil | color | String.t(),
+          "background-color": nil | color | String.t(),
           blink: nil | :rapid | :slow,
           intensity: nil | :bright | :faint,
           frame: nil | :framed | :encircled,
@@ -54,7 +54,7 @@ defmodule ExTerm.Style do
     background_control = apply(IO.ANSI, :"#{color}_background", [])
 
     def from_ansi(style, unquote(background_control) <> rest) do
-      {%{style | bgcolor: unquote(color)}, rest}
+      {%{style | "background-color": unquote(color)}, rest}
     end
 
     light_color = :"light-#{color}"
@@ -68,7 +68,7 @@ defmodule ExTerm.Style do
     light_background_control = apply(IO.ANSI, :"light_#{color}_background", [])
 
     def from_ansi(style, unquote(light_background_control) <> rest) do
-      {%{style | bgcolor: unquote(light_color)}, rest}
+      {%{style | "background-color": unquote(light_color)}, rest}
     end
   end
 
@@ -125,7 +125,7 @@ defmodule ExTerm.Style do
   for {field, function} <- %{
         frame: :not_framed_encircled,
         color: :default_color,
-        bgcolor: :default_background
+        "background-color": :default_background
       } do
     clear = apply(IO.ANSI, function, [])
 
@@ -140,16 +140,55 @@ defmodule ExTerm.Style do
     {%__MODULE__{}, rest}
   end
 
+  def from_ansi(style, "\e[38;5;" <> rest) do
+    case Integer.parse(rest) do
+      {color, "m" <> new_rest} when color in 16..255 ->
+        {%{style | color: get_color(color)}, new_rest}
+
+      _ ->
+        :not_stryle
+    end
+  end
+
+  def from_ansi(style, "\e[48;5;" <> rest) do
+    case Integer.parse(rest) do
+      {color, "m" <> new_rest} when color in 16..255 ->
+        {%{style | "background-color": get_color(color)}, new_rest}
+
+      _ ->
+        :not_stryle
+    end
+  end
+
   def from_ansi(_style, _rest), do: :not_style
 
-  @keys ~w(color bgcolor blink intensity frame conceal italic underline crossed_out overlined)a
+  defp get_color(integer) do
+    base = integer - 16
+    r = base |> div(36) |> Kernel.*(3) |> Integer.to_string(16)
+    gb = rem(base, 36)
+    g = gb |> div(6) |> Kernel.*(3) |> Integer.to_string(16)
+    b = gb |> rem(6) |> Kernel.*(3) |> Integer.to_string(16)
+    "##{r}#{g}#{b}"
+  end
+
+  @keys ~w(color "background-color" blink intensity frame conceal italic underline crossed_out overlined)a
   def to_iodata(style) do
     Enum.flat_map(@keys, &kv_to_css(&1, Map.get(style, &1)))
   end
 
-  defp kv_to_css(key, value) do
-    List.wrap(if value, do: [[to_string(key), ":var(--exterm-", to_string(value), ");"]])
+  # TODO: make sure that other items are represented as styles.
+
+  defp kv_to_css(key, value) when key in [:color, :"background-color"] do
+    case value do
+      _ when is_atom(value) ->
+        List.wrap(if value, do: [to_string(key), ":var(--exterm-", to_string(value), ");"])
+
+      _ when is_binary(value) ->
+        [to_string(key), "#{value};"]
+    end
   end
+
+  defp kv_to_css(_key, _value), do: []
 
   def from_css(css) do
     css
@@ -158,9 +197,22 @@ defmodule ExTerm.Style do
     |> Enum.reduce(%__MODULE__{}, &style_prop_from_string/2)
   end
 
+  @color_map %{?0 => 0x0, ?3 => 0x3, ?6 => 0x6, ?9 => 0x9, ?b => 0xB, ?f => 0xF}
+  @color_chars Map.keys(@color_map)
+  defguardp is_color(x) when x in @color_chars
+
   def style_prop_from_string(prop, style) do
     case String.split(prop, ":") do
-      ["color", color] -> %{style | color: color_from_prop(color)}
+      ["color", "var(" <> color_str] ->
+        color =
+          color_str
+          |> String.replace_suffix(")", "")
+          |> color_from_prop
+
+        %{style | color: color}
+
+      ["color", str = <<"#", a, b, c>>] when is_color(a) and is_color(b) and is_color(c) ->
+        str
     end
   end
 
