@@ -20,4 +20,10 @@ defmodule ExTermWeb.Router do
 
     live_term "/", pubsub_server: ExTerm.PubSub
   end
+
+  scope "/test" do
+    pipe_through :browser
+
+    live_term "/", pubsub_server: ExTerm.PubSub, terminal: {ExTermTest.TerminalMock, :run, []}, layout: {5, 5}
+  end
 end

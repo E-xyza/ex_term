@@ -44,11 +44,19 @@ defmodule ExTerm.IexBackend.IOServer do
 
   @impl GenServer
   def init(opts) do
+    # optional configuration: declare a lambda for an unconventional server
+    terminal_runner = Keyword.get(opts, :terminal, fn -> IEx.Server.run([]) end)
     pubsub_server = Keyword.fetch!(opts, :pubsub_server)
     pubsub_topic = pubsub_topic(self())
-    console = Console.new(handle_update: &broadcast_update(&1, pubsub_server, pubsub_topic))
+    opts = Keyword.merge(opts, handle_update: &broadcast_update(&1, pubsub_server, pubsub_topic))
 
-    {:ok, shell} = TerminalSupervisor.start_child(fn -> IEx.Server.run([]) end)
+    console = Console.new(opts)
+
+    # caller propagation
+    callers = Keyword.get(opts, :callers, [])
+    Process.put(:"$callers", callers)
+
+    {:ok, shell} = TerminalSupervisor.start_child(terminal_runner)
 
     {:ok,
      %__MODULE__{

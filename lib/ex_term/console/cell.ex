@@ -16,8 +16,10 @@ defmodule ExTerm.Console.Cell do
 
     cursor_class =
       case {location === cursor, assigns.prompt} do
-        {true, true} -> "exterm-cursor-active"
-        {true, _} -> "exterm-cursor"
+        {true, true} ->
+           "exterm-cursor-active"
+        {true, _} ->
+          "exterm-cursor"
         _ -> nil
       end
 

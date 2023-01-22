@@ -43,7 +43,7 @@ defmodule ExTerm.Console do
 
   def render(assigns) do
     ~H"""
-    <div id="exterm-console" phx-update="append">
+    <div id="exterm-console" phx-update="append" data-exterm-cursor-row={elem(@cursor, 0)} data-exterm-cursor-column={elem(@cursor, 1)}>
       <Cell.render contenteditable="false" :for={cell <- @cells} cell={cell} cursor={@cursor} prompt={@prompt}/>
     </div>
     """
@@ -68,7 +68,7 @@ defmodule ExTerm.Console do
   @spec move_cursor(t, location) :: t
 
   # cell access
-  @spec get(t, location | Update.cell_range() | Update.end_range()) :: nil | Cell.t() | [Cell.t()]
+  @spec get(t, location) :: nil | Cell.t()
 
   # primitive cell mutation
   @spec put_cell(t, location, Cell.t()) :: t

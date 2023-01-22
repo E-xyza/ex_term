@@ -179,7 +179,7 @@ defmodule ExTerm.Console.StringTracker do
     Console.insert(tracker.console, [{{row, columns + 1}, Cell.sentinel()} | new_cells])
 
     tracker
-    |> Map.replace!(:update, Update.merge_into(tracker.update, {{row, 1}, {row, :end}}))
+    |> Map.replace!(:update, Update.merge_changes(tracker.update, {{row, 1}, {row, :end}}))
     |> _blit_string_row(columns, string)
   end
 
@@ -188,7 +188,7 @@ defmodule ExTerm.Console.StringTracker do
     # make sure that the update reflects that this is the end line
     new_update =
       tracker
-      |> Map.replace!(:update, Update.merge_into(tracker.update, {cursor, {row, :end}}))
+      |> Map.replace!(:update, Update.merge_changes(tracker.update, {cursor, {row, :end}}))
       |> hard_return(columns)
 
     {new_update, string}
@@ -223,7 +223,7 @@ defmodule ExTerm.Console.StringTracker do
       {grapheme, rest} ->
         new_cells = [{cursor, %Cell{char: grapheme, style: tracker.style}} | tracker.cells]
 
-        new_update = Update.merge_into(tracker.update, cursor)
+        new_update = Update.merge_changes(tracker.update, cursor)
 
         tracker
         |> Map.merge(%{cursor: {row, column + 1}, update: new_update, cells: new_cells})
