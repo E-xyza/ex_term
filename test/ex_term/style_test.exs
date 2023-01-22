@@ -16,7 +16,8 @@ defmodule ExTermTest.StyleTest do
       background_text = apply(IO.ANSI, :"#{color}_background", []) <> "text"
 
       test "assigns background #{color} correctly" do
-        assert {%{bgcolor: unquote(color)}, "text"} = Style.from_ansi(unquote(background_text))
+        assert {%{"background-color": unquote(color)}, "text"} =
+                 Style.from_ansi(unquote(background_text))
       end
 
       lt_color = :"light-#{color}"
@@ -31,7 +32,7 @@ defmodule ExTermTest.StyleTest do
       background_light_text = apply(IO.ANSI, :"light_#{color}_background", []) <> "text"
 
       test "assigns background light #{color} correctly" do
-        assert {%{bgcolor: unquote(lt_color)}, "text"} =
+        assert {%{"background-color": unquote(lt_color)}, "text"} =
                  Style.from_ansi(unquote(background_light_text))
       end
     end
@@ -118,13 +119,29 @@ defmodule ExTermTest.StyleTest do
     @default_background IO.ANSI.default_background() <> "text"
     test "default background works" do
       empty_css = %Style{}
-      assert {^empty_css, "text"} = Style.from_ansi(%Style{bgcolor: :blue}, @default_background)
+
+      assert {^empty_css, "text"} =
+               Style.from_ansi(%Style{"background-color": :blue}, @default_background)
     end
 
     @reset IO.ANSI.reset() <> "text"
     test "reset works" do
       empty_css = %Style{}
-      assert {^empty_css, "text"} = Style.from_ansi(%Style{bgcolor: :blue}, @reset)
+      assert {^empty_css, "text"} = Style.from_ansi(%Style{"background-color": :blue}, @reset)
+    end
+  end
+
+  describe "full color" do
+    test "arbitrary color value works" do
+      fg_css = %Style{color: "#999"}
+      assert {^fg_css, "text"} = Style.from_ansi(%Style{}, IO.ANSI.color(3, 3, 3) <> "text")
+    end
+
+    test "arbitrary background color value works" do
+      bg_css = %Style{"background-color": "#999"}
+
+      assert {^bg_css, "text"} =
+               Style.from_ansi(%Style{}, IO.ANSI.color_background(3, 3, 3) <> "text")
     end
   end
 end
