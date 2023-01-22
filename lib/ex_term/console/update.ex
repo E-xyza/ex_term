@@ -132,7 +132,7 @@ defmodule ExTerm.Console.Update do
       register_cell_change(console, {cell_changes, {row(cell_changes), :end}})
     else
       get_current_update()
-      |> merge_into(cell_changes)
+      |> merge_changes(cell_changes)
       |> put_current_update()
     end
 
@@ -165,13 +165,26 @@ defmodule ExTerm.Console.Update do
   def merge(new_update) do
     get_current_update()
     |> Map.update!(:cursor, fn old -> new_update.cursor || old end)
-    |> merge_into(new_update.changes)
+    |> merge_changes(new_update.changes)
     |> put_current_update()
 
     :ok
   end
 
-  @spec merge_into(t, cell_change | cell_changes) :: t
+  @spec merge_cursor(t) :: t
+  @doc """
+  merges the cursor location into the changes; this should be the last step
+  before sending the update message.
+  """
+  def merge_cursor(update) do
+    if cursor = update.cursor do
+      Map.update!(update, :changes, &augment_cell_change(&1, cursor))
+    else
+      update
+    end
+  end
+
+  @spec merge_changes(t, cell_change | cell_changes) :: t
   @doc """
   To be used when tracking update changes in a custom fashion bypassing updates
   separate from the process dictionary.
@@ -179,12 +192,12 @@ defmodule ExTerm.Console.Update do
   Should always be suceeded by `merge/2`, which will merge these separate updates
   into the process dictionary
   """
-  def merge_into(update, change) when is_tuple(change) do
+  def merge_changes(update, change) when is_tuple(change) do
     Map.update!(update, :changes, &augment_cell_change(&1, change))
   end
 
-  def merge_into(update, changes) when is_list(changes) do
-    Enum.reduce(changes, update, &merge_into(&2, &1))
+  def merge_changes(update, changes) when is_list(changes) do
+    Enum.reduce(changes, update, &merge_changes(&2, &1))
   end
 
   @doc false
@@ -199,7 +212,7 @@ defmodule ExTerm.Console.Update do
 
     # be silent if no changes were made.
     unless update === %__MODULE__{cursor: nil, changes: []} do
-      Console.update_with(console, update)
+      Console.update_with(console, merge_cursor(update))
     end
 
     console

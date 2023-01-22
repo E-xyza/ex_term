@@ -9,8 +9,8 @@ defmodule ExTerm.IexBackend do
 
   @impl Backend
   def on_connect(_params, %{"exterm-backend" => {__MODULE__, opts}}, socket) do
-    # TODO: move this to supervising it with a  DynamicSupervisor
     io_server = Keyword.get(opts, :io_server, ExTerm.IexBackend.IOServer)
+    opts = Keyword.put(opts, :callers, [self() | Process.get(:"$callers", [])])
 
     {:ok, pid} = DynamicSupervisor.start_child(ExTerm.BackendSupervisor, {io_server, opts})
 

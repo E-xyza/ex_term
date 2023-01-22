@@ -1,4 +1,6 @@
 defmodule ExTermTest.FlokiTools do
+  @moduledoc false
+
   alias ExTerm.Style
 
   def dump(content) do
@@ -7,23 +9,33 @@ defmodule ExTermTest.FlokiTools do
     |> Floki.text()
   end
 
-  def line_to_text(content, number) do
-    [{"div", _, line}] = Floki.find(content, "#exterm-row-#{number}")
-
-    line
-    |> Enum.map(fn {"div", _, content} -> content end)
+  def to_text(content) do
+    content
+    |> Floki.find("#exterm-console span")
+    |> Enum.flat_map(&List.wrap(span_to_cell(&1)))
     |> IO.iodata_to_binary()
+    |> String.trim_trailing("\n")
+  end
+
+  defp span_to_cell(span) do
+    classes = span
+    |> Floki.attribute("class")
+    |> List.first
+
+    if classes =~ "exterm-cell-sentinel", do: "\n", else: Floki.text(span)
   end
 
   def cursor_location(content) do
-    [attr] =
-      content
-      |> Floki.find(".exterm-cursor")
-      |> Floki.attribute("id")
+    console = Floki.find(content, "#exterm-console")
 
-    ["exterm", "cell", row, column] = String.split(attr, "-")
-
-    {String.to_integer(row), String.to_integer(column)}
+    ~w[row column]
+    |> Enum.map(fn dim ->
+      console
+      |> Floki.attribute("data-exterm-cursor-#{dim}")
+      |> List.first
+      |> String.to_integer
+    end)
+    |> List.to_tuple
   end
 
   def cursor_active?(content) do

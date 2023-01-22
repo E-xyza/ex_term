@@ -21,8 +21,10 @@ defmodule ExTerm.TerminalSupervisor do
       :erlang.group_leader(group_leader, self())
 
       case task do
-        {m, f, a} -> apply(m, f, a)
-        task when is_function(task, 0) -> task.()
+        {m, f, a} ->
+          apply(m, f, a)
+        task when is_function(task, 0) ->
+          task.()
       end
     end
 
