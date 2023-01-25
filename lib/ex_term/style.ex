@@ -6,11 +6,13 @@ defmodule ExTerm.Style do
     :blink,
     :frame,
     :intensity,
+    :"white-space",
+    :"overflow-anchor",
     conceal: false,
     italic: false,
     underline: false,
     crossed_out: false,
-    overlined: false
+    overlined: false,
   ]
 
   colors = ~w(black red green yellow blue magenta cyan white)a
@@ -35,7 +37,9 @@ defmodule ExTerm.Style do
           italic: boolean,
           underline: boolean,
           crossed_out: boolean,
-          overlined: boolean
+          overlined: boolean,
+          "white-space": nil | :pre,
+          "overflow-anchor": nil | :auto
         }
 
   def new, do: %__MODULE__{}
@@ -142,14 +146,24 @@ defmodule ExTerm.Style do
 
   def from_ansi(_style, _rest), do: :not_style
 
-  @keys ~w(color bgcolor blink intensity frame conceal italic underline crossed_out overlined)a
+  @keys ~w(color bgcolor blink intensity frame conceal italic underline crossed_out overlined white-space overflow-anchor)a
   def to_iodata(style) do
     Enum.flat_map(@keys, &kv_to_css(&1, Map.get(style, &1)))
   end
 
-  defp kv_to_css(key, value) do
+  # colors are remappable so we have to use root variables
+  @colors ~w(color bgcolor)a
+  defp kv_to_css(key, value) when key in @colors do
     List.wrap(if value, do: [[to_string(key), ":var(--exterm-", to_string(value), ");"]])
   end
+
+  # other types might be directly encodable in the Style struct.
+  @other ~w(white-space overflow-anchor)a
+  defp kv_to_css(key, value) when key in @other do
+    List.wrap(if value, do: [[to_string(key), ":", to_string(value), ";"]])
+  end
+
+  defp kv_to_css(_, _), do: []
 
   def from_css(css) do
     css

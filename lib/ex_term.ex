@@ -53,6 +53,7 @@ defmodule ExTerm do
   alias ExTerm.Console.Cell
   alias ExTerm.Console.Helpers
   alias ExTerm.Console.Update
+  alias ExTerm.Style
   alias Phoenix.LiveView.JS
 
   require Console
@@ -73,12 +74,13 @@ defmodule ExTerm do
     """
   end
 
-  defp class_for(state) do
-    if state, do: "exterm exterm-focused", else: "exterm exterm-blurred"
+  defp class_for(focus) do
+    case focus do
+      true -> ~w"exterm exterm-focused"
+      false -> ~w"exterm exterm-blurred"
+      :error -> ~w"exterm exterm-errored"
+    end
   end
-
-  # TODO: modularize this.
-  @backend ExTerm.IexBackend
 
   def mount(params, session = %{"exterm-backend" => {backend, opts}}, socket) do
     if connected?(socket) do
@@ -166,15 +168,27 @@ defmodule ExTerm do
   # handlers
 
   def handle_event("focus", _payload, socket) do
-    socket
-    |> set_focus(true)
-    |> socket.assigns.backend.on_focus()
+    case socket.assigns.focus do
+      false ->
+        socket
+        |> set_focus(true)
+        |> socket.assigns.backend.on_focus()
+
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("blur", _payload, socket) do
-    socket
-    |> set_focus(false)
-    |> socket.assigns.backend.on_blur()
+    case socket.assigns.focus do
+      true ->
+        socket
+        |> set_focus(false)
+        |> socket.assigns.backend.on_blur()
+
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("keydown", %{"key" => key}, socket) do
@@ -211,5 +225,12 @@ defmodule ExTerm do
 
   def handle_info({:prompt, activity}, socket) when activity in [:active, :inactive] do
     {:noreply, set_prompt(socket, activity === :active)}
+  end
+
+  def handle_info({:DOWN, _, :process, _, {err, stacktrace}}, socket) do
+    message = "fatal error crashed the console\n" <> Exception.format(:error, err, stacktrace)
+    {row, _} = socket.assigns.cursor
+    style = %Style{color: :red, "white-space": :pre, "overflow-anchor": :auto}
+    {:noreply, assign(socket, focus: :error, cells: [{{row + 1, 1}, %Cell{style: style, char: message}}])}
   end
 end

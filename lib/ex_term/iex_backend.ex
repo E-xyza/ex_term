@@ -19,6 +19,9 @@ defmodule ExTerm.IexBackend do
 
     PubSub.subscribe(pubsub_server, pubsub_topic)
 
+    # monitor the process, LiveView should know when its child has died.
+    Process.monitor(pid)
+
     {:ok, io_server.console(pid), assign(socket, io_server: {io_server, pid})}
   end
 

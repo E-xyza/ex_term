@@ -18,9 +18,10 @@ defmodule ExTermTest.FlokiTools do
   end
 
   defp span_to_cell(span) do
-    classes = span
-    |> Floki.attribute("class")
-    |> List.first
+    classes =
+      span
+      |> Floki.attribute("class")
+      |> List.first()
 
     if classes =~ "exterm-cell-sentinel", do: "\n", else: Floki.text(span)
   end
@@ -32,10 +33,10 @@ defmodule ExTermTest.FlokiTools do
     |> Enum.map(fn dim ->
       console
       |> Floki.attribute("data-exterm-cursor-#{dim}")
-      |> List.first
-      |> String.to_integer
+      |> List.first()
+      |> String.to_integer()
     end)
-    |> List.to_tuple
+    |> List.to_tuple()
   end
 
   def cursor_active?(content) do

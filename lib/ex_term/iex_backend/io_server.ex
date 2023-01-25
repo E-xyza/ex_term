@@ -250,10 +250,9 @@ defmodule ExTerm.IexBackend.IOServer do
           Helpers.transaction console, :mutate do
             {init_row, _} = Console.cursor(console)
 
-            {end_row, _} =
-              console
-              |> Console.insert_iodata(options, row)
-              |> Console.get_metadata(:cursor)
+            Console.insert_iodata(console, options, row)
+
+            {end_row, _} = Console.get_metadata(console, :cursor)
 
             # rows added
             {prompt, row + end_row - init_row}
@@ -294,7 +293,7 @@ defmodule ExTerm.IexBackend.IOServer do
   def on_paste(server, string), do: GenServer.cast(server, {:on_paste, string})
 
   defp on_paste_impl(string, state) do
-    {:norepply, %{state | prompt: Prompt.paste(state.prompt, string)}}
+    {:noreply, %{state | prompt: Prompt.paste(state.prompt, string)}}
   end
 
   ### UTILITIES

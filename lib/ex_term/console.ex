@@ -75,8 +75,8 @@ defmodule ExTerm.Console do
   @spec new_row(t, pos_integer() | :end) :: t
 
   # complex cell mutation
-  @spec put_iodata(t, String.t()) :: :ok
-  @spec insert_iodata(t, String.t(), row :: pos_integer()) :: Range.t()
+  @spec put_iodata(t, iodata) :: :ok
+  @spec insert_iodata(t, iodata, row :: pos_integer()) :: Range.t()
   # @spec clear(t) :: t
 
   #############################################################################
@@ -344,7 +344,7 @@ defmodule ExTerm.Console do
             [old_cursor]
 
           {last, false} ->
-            raise "cursor move exceeded the console buffer (#{move_msg(console, last, new_cursor)})"
+            raise "cursor move to #{inspect(new_cursor)} exceeded the console buffer (#{move_msg(console, last, new_cursor)})"
         end
 
       Update.change_cursor(new_cursor)

@@ -17,10 +17,13 @@ defmodule ExTerm.Console.Cell do
     cursor_class =
       case {location === cursor, assigns.prompt} do
         {true, true} ->
-           "exterm-cursor-active"
+          "exterm-cursor-active"
+
         {true, _} ->
           "exterm-cursor"
-        _ -> nil
+
+        _ ->
+          nil
       end
 
     class = ["exterm-cell", sentinel_class, cursor_class]
