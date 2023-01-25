@@ -231,6 +231,8 @@ defmodule ExTerm do
     message = "fatal error crashed the console\n" <> Exception.format(:error, err, stacktrace)
     {row, _} = socket.assigns.cursor
     style = %Style{color: :red, "white-space": :pre, "overflow-anchor": :auto}
-    {:noreply, assign(socket, focus: :error, cells: [{{row + 1, 1}, %Cell{style: style, char: message}}])}
+
+    {:noreply,
+     assign(socket, focus: :error, cells: [{{row + 1, 1}, %Cell{style: style, char: message}}])}
   end
 end
