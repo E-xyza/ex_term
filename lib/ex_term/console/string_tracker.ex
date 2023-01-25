@@ -141,7 +141,7 @@ defmodule ExTerm.Console.StringTracker do
           old_cursor
 
         {row, column} ->
-          {row + rows, column}
+          {row + rows - 1, column}
       end
 
     tracker.console
