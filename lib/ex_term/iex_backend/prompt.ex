@@ -102,7 +102,7 @@ defmodule ExTerm.IexBackend.Prompt do
   end
 
   def bump_prompt(prompt = %{location: {row, column}}, start..finish) do
-    %{prompt | location: {row + finish - start + 1, column}}
+    %{prompt | location: {row + finish - start, column}}
   end
 
   defp breakdown(charlist_or_string, so_far \\ [])

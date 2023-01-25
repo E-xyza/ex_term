@@ -41,10 +41,10 @@ defmodule ExTerm.Console.StringTracker do
     :last_cell
   ]
 
-  defstruct @enforce_keys ++ [update: %Update{}, cells: []]
+  defstruct @enforce_keys ++ [update: %Update{}, cells: [], rows_inserted: 1]
 
   @type mode ::
-          :put | :paint | {:insert, from_row :: pos_integer(), total_rows :: non_neg_integer()}
+          :put | :paint | {:insert, from_row :: pos_integer()}
 
   @type t :: %__MODULE__{
           console: Console.t(),
@@ -55,7 +55,8 @@ defmodule ExTerm.Console.StringTracker do
           layout: Console.location(),
           last_cell: Console.location(),
           update: Update.t(),
-          cells: [Console.cellinfo()]
+          cells: [Console.cellinfo()],
+          rows_inserted: pos_integer()
         }
 
   @spec new(Console.t(), nil | pos_integer()) :: t
@@ -65,7 +66,7 @@ defmodule ExTerm.Console.StringTracker do
 
     {new_cursor, mode} =
       if insertion do
-        {{insertion, 1}, {:insert, insertion, 1}}
+        {{insertion, 1}, {:insert, insertion}}
       else
         {old_cursor, :put}
       end
@@ -100,7 +101,7 @@ defmodule ExTerm.Console.StringTracker do
 
   @spec insert_string_rows(t(), String.t()) :: t()
   def insert_string_rows(
-        tracker = %{mode: {:insert, _, _}, cursor: {row, _}, layout: {_, columns}},
+        tracker = %{mode: {:insert, _}, cursor: {row, _}, layout: {_, columns}},
         string
       ) do
     # NB: don't cache the number of columns.  Row length should be fixed based
@@ -123,16 +124,15 @@ defmodule ExTerm.Console.StringTracker do
     end
   end
 
-  @spec flush_updates(t) :: :ok | Range.t()
+  @spec flush_updates(t) :: Range.t()
   # flush updates handles three cases depending on what the state of the string tracker
   # is.  If it's in string mode, then it immediately
-  def flush_updates(tracker = %{mode: {:insert, from_row, count}}) do
-    count = count - 1
+  def flush_updates(tracker = %{mode: {:insert, from_row}, rows_inserted: rows}) do
     # note that count has an extra because we do a hard return
     # at the end of an insert in all cases.
     update_cells =
       tracker.console
-      |> Console._bump_rows(from_row, count)
+      |> Console._bump_rows(from_row, rows - 1)
       |> Enum.reverse(tracker.cells)
 
     new_cursor =
@@ -141,14 +141,14 @@ defmodule ExTerm.Console.StringTracker do
           old_cursor
 
         {row, column} ->
-          {row + count, column}
+          {row + rows - 1, column}
       end
 
     tracker.console
     |> Console.insert(update_cells)
     |> Console.move_cursor(new_cursor)
 
-    range = from_row..(from_row + count - 1)
+    range = from_row..(from_row + rows - 1)
 
     Update.set_insertion(range)
     Update.merge(tracker.update)
@@ -237,16 +237,15 @@ defmodule ExTerm.Console.StringTracker do
     %{tracker | cursor: new_cursor, update: %{tracker.update | cursor: new_cursor}}
   end
 
-  defp hard_return(tracker = %{cursor: {row, column}, mode: {:insert, start, rows}}, columns) do
-    new_mode = {:insert, start, rows + 1}
-
+  defp hard_return(tracker = %{cursor: {row, column}, mode: {:insert, start}}, columns)
+       when column < columns do
     new_cells = Enum.reduce(column..columns, tracker.cells, &[{{row, &1}, %Cell{}} | &2])
 
-    %{tracker | cursor: {row + 1, 1}, mode: new_mode, cells: new_cells}
+    %{tracker | cursor: {row + 1, 1}, cells: new_cells, rows_inserted: tracker.rows_inserted + 1}
   end
 
   defp hard_return(tracker = %{cursor: {row, _}}, _) do
-    %{tracker | cursor: {row + 1, 1}}
+    %{tracker | cursor: {row + 1, 1}, rows_inserted: tracker.rows_inserted + 1}
   end
 
   defp tab_destination(column, tab_length) do

@@ -6,6 +6,8 @@ defmodule ExTerm.Style do
     :blink,
     :frame,
     :intensity,
+    :"white-space",
+    :"overflow-anchor",
     conceal: false,
     italic: false,
     underline: false,
@@ -35,7 +37,9 @@ defmodule ExTerm.Style do
           italic: boolean,
           underline: boolean,
           crossed_out: boolean,
-          overlined: boolean
+          overlined: boolean,
+          "white-space": nil | :pre,
+          "overflow-anchor": nil | :auto
         }
 
   def new, do: %__MODULE__{}
@@ -146,7 +150,7 @@ defmodule ExTerm.Style do
         {%{style | color: get_color(color)}, new_rest}
 
       _ ->
-        :not_stryle
+        :not_style
     end
   end
 
@@ -156,11 +160,13 @@ defmodule ExTerm.Style do
         {%{style | "background-color": get_color(color)}, new_rest}
 
       _ ->
-        :not_stryle
+        :not_style
     end
   end
 
   def from_ansi(_style, _rest), do: :not_style
+
+  @keys ~w(color bgcolor blink intensity frame conceal italic underline crossed_out overlined white-space overflow-anchor)a
 
   defp get_color(integer) do
     base = integer - 16
@@ -171,21 +177,26 @@ defmodule ExTerm.Style do
     "##{r}#{g}#{b}"
   end
 
-  @keys ~w(color "background-color" blink intensity frame conceal italic underline crossed_out overlined)a
   def to_iodata(style) do
     Enum.flat_map(@keys, &kv_to_css(&1, Map.get(style, &1)))
   end
 
-  # TODO: make sure that other items are represented as styles.
-
-  defp kv_to_css(key, value) when key in [:color, :"background-color"] do
+  # colors are remappable so we have to use root variables
+  @colors ~w(color background-color)a
+  defp kv_to_css(key, value) when key in @colors do
     case value do
       _ when is_atom(value) ->
-        List.wrap(if value, do: [to_string(key), ":var(--exterm-", to_string(value), ");"])
+        [to_string(key), ":var(--exterm-", to_string(value), ");"]
 
       _ when is_binary(value) ->
         [to_string(key), "#{value};"]
     end
+  end
+
+  # other types might be directly encodable in the Style struct.
+  @other ~w(white-space overflow-anchor)a
+  defp kv_to_css(key, value) when key in @other do
+    List.wrap(if value, do: [[to_string(key), ":", to_string(value), ";"]])
   end
 
   defp kv_to_css(_key, _value), do: []
