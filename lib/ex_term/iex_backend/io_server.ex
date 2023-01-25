@@ -245,14 +245,17 @@ defmodule ExTerm.IexBackend.IOServer do
           {prompt, row}
 
         {:yes, [], list_of_options} ->
-          options = Enum.join(list_of_options, "\t")
+          spacing = find_spacing(list_of_options, 10)
+          |> dbg(limit: 25)
 
           Helpers.transaction console, :mutate do
             {init_row, _} = Console.cursor(console)
 
-            Console.insert_iodata(console, options, row)
+            table = tab_table(console, list_of_options, init_row, spacing)
 
-            {end_row, _} = Console.get_metadata(console, :cursor)
+            Console.insert_iodata(console, table, row)
+
+            {end_row, _} = Console.cursor(console)
 
             # rows added
             {prompt, row + end_row - init_row}
@@ -279,6 +282,54 @@ defmodule ExTerm.IexBackend.IOServer do
   end
 
   defp special_keydown(_, state), do: {:noreply, state}
+
+  # TODO: move these out to their own module and test
+  defp find_spacing(options, count) do
+    options
+    |> Enum.map(&(length(&1) + 1))
+    |> Enum.max
+    |> case do
+      divisible when rem(divisible, count) === 0 -> divisible
+      other -> other + count - rem(other, count)
+    end
+  end
+
+  defp tab_table(console, list_of_options, row, spacing) do
+    {_, columns} = Console.layout(console)
+    tab_table(console, list_of_options, {row, 1}, spacing, columns, [])
+  end
+
+  defp tab_table(_, [], _, _, _, so_far), do: Enum.reverse(so_far)
+
+  defp tab_table(console, opts = [this | rest], {row, col}, spacing, columns, so_far) do
+    # get the length of the current row
+    columns = case Console.columns(console, row) do
+      0 -> columns
+      exists -> exists
+    end
+
+    case next_spacing(col, this, spacing)  do
+      next when col === 1 and next >= columns + 1 ->
+        {truncated, leftover} = Enum.split(this, columns)
+        tab_table(console, [leftover | rest], {row + 1, 1}, spacing, columns, [?\n, truncated | so_far])
+      next when next === columns + 1 ->
+        tab_table(console, rest, {row + 1, 1}, spacing, columns, [?\n, this | so_far])
+      next when next > columns ->
+        tab_table(console, rest, {row + 1, 1}, spacing, columns, opts)
+      next when next <= columns ->
+        new_this = this |> IO.iodata_to_binary |> String.pad_trailing(spacing)
+        tab_table(console, rest, {row, next}, spacing, columns, [new_this | so_far])
+    end
+  end
+
+  defp next_spacing(col, this, spacing) do
+    length = length(this) + 1
+    case col + length do
+      s when rem(s, spacing) === 1 -> s
+      s when rem(s, spacing) === 0 -> s + 1
+      s -> s + spacing - rem(s, spacing) + 1
+    end
+  end
 
   def on_keyup(server, key), do: GenServer.cast(server, {:on_keyup, key})
 
