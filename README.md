@@ -21,41 +21,22 @@ def deps do
 end
 ```
 
-2. Connect the ex_term CSS:
-  - if you're using a css bundler, add to your "app.css" (or other css file in your assets directory)
-
-    ```elixir
-    @import "../../deps/ex_term/lib/css/default.css";
-    ```
-
-  - you may need a different strategy if you aren't using a css bundler.
-
-3. Create a live view in your routes
+1. Create a live view in your routes
   - as a standalone liveview
 
     ```elixir
+    import ExTerm.Router
+
     scope "/" do
       pipe_through :browser
-      pipe_through :extra_authorization
-
-      live "/", ExTerm
-    end
-    ```
-
-  - you can also use it as a live component!
   
-    ```elixir
-    <.live_component module={ExTerm}/>
+      live_term "/", pubsub_server: ExTerm.PubSub
+    end
     ```
 
 ## Documentation
 
 Documentation is available on hexdocs.pm: https://hexdocs.pm/ex_term
-
-### Not implemented yet (soon):
-- up arrow (history)
-- tab completion
-- copy/paste
 
 ### Planned (Pro?) features:
 - provenance tracking
