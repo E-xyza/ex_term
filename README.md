@@ -15,7 +15,7 @@ browser.
 def deps do
   [
     # ...
-    {:ex_term, "~> 0.1"}
+    {:ex_term, "~> 0.2"}
     # ...
   ]
 end
@@ -30,7 +30,7 @@ end
     scope "/" do
       pipe_through :browser
   
-      live_term "/", pubsub_server: ExTerm.PubSub
+      live_term "/", pubsub_server: MyAppWeb.PubSub
     end
     ```
 
