@@ -246,7 +246,6 @@ defmodule ExTerm.IexBackend.IOServer do
 
         {:yes, [], list_of_options} ->
           spacing = find_spacing(list_of_options, 10)
-          |> dbg(limit: 25)
 
           Helpers.transaction console, :mutate do
             {init_row, _} = Console.cursor(console)
