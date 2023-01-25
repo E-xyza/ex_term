@@ -77,7 +77,6 @@ defmodule ExTerm.Console do
   # complex cell mutation
   @spec put_iodata(t, iodata) :: :ok
   @spec insert_iodata(t, iodata, row :: pos_integer()) :: Range.t()
-  # @spec clear(t) :: t
 
   #############################################################################
   ## GUARDS
@@ -329,6 +328,10 @@ defmodule ExTerm.Console do
       tuple
   end
 
+  defmatchspecp cells_from(location) do
+    tuple = {this, cell} when this >= location -> tuple
+  end
+
   def move_cursor(console, new_cursor = {row, column}) do
     old_cursor = cursor(console)
 
@@ -366,7 +369,7 @@ defmodule ExTerm.Console do
   # functional utilities
   @doc false
   # this is for internal use only.
-  def update_with(console, update) do
+  def broadcast(console, update) do
     case get_metadata(console, :handle_update) do
       fun when is_function(fun, 1) ->
         fun.(update)
@@ -481,6 +484,13 @@ defmodule ExTerm.Console do
     console
     |> table
     |> :ets.select_count(ms)
+  end
+
+  @spec select_from(t, Console.location) :: [cellinfo]
+  defaccess select_from(console, location) do
+    console
+    |> table
+    |> :ets.select(cells_from(location))
   end
 
   @spec insert(t, tuple | [tuple]) :: t

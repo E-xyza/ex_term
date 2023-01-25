@@ -185,6 +185,8 @@ defmodule ExTerm.Style do
   @colors ~w(color background-color)a
   defp kv_to_css(key, value) when key in @colors do
     case value do
+      nil -> []
+      
       _ when is_atom(value) ->
         [to_string(key), ":var(--exterm-", to_string(value), ");"]
 

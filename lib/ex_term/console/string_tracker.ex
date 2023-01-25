@@ -25,6 +25,7 @@ defmodule ExTerm.Console.StringTracker do
 
   use MatchSpec
 
+  alias ExTerm.ANSI
   alias ExTerm.Console
   alias ExTerm.Console.Cell
   alias ExTerm.Console.Update
@@ -43,12 +44,13 @@ defmodule ExTerm.Console.StringTracker do
 
   defstruct @enforce_keys ++ [update: %Update{}, cells: [], rows_inserted: 1]
 
-  @type mode ::
-          :put | :paint | {:insert, from_row :: pos_integer()}
+  @typep put :: :put
+  @typep paint :: :paint
+  @typep insert :: {:insert, from_row :: pos_integer()}
 
-  @type t :: %__MODULE__{
+  @opaque state(mode_subtype) :: %__MODULE__{
           console: Console.t(),
-          mode: mode,
+          mode: mode_subtype,
           style: Style.t(),
           cursor: Console.location(),
           old_cursor: Console.location(),
@@ -59,7 +61,10 @@ defmodule ExTerm.Console.StringTracker do
           rows_inserted: pos_integer()
         }
 
-  @spec new(Console.t(), nil | pos_integer()) :: t
+  @opaque state() :: state(:put) | state(:paint) | state(:insert)
+
+  @spec new(Console.t(), nil) :: state(:put)
+  @spec new(Console.t(), pos_integer) :: state(:insert)
   def new(console, insertion \\ nil) do
     [cursor: old_cursor, layout: layout, style: style] =
       Console.get_metadata(console, [:cursor, :layout, :style])
@@ -84,7 +89,7 @@ defmodule ExTerm.Console.StringTracker do
     }
   end
 
-  @spec put_string_rows(t(), String.t()) :: t()
+  @spec put_string_rows(state(put), String.t()) :: state(put) | state(paint)
   def put_string_rows(tracker = %{mode: :put, cursor: {row, _}}, string) do
     # NB: don't cache the number of rows.  Row length should be fixed based on
     # the existing capacity of the column, so we have to check each time.
@@ -99,7 +104,7 @@ defmodule ExTerm.Console.StringTracker do
     end
   end
 
-  @spec insert_string_rows(t(), String.t()) :: t()
+  @spec insert_string_rows(state(insert), String.t()) :: state(insert) | state(paint)
   def insert_string_rows(
         tracker = %{mode: {:insert, _}, cursor: {row, _}, layout: {_, columns}},
         string
@@ -124,7 +129,9 @@ defmodule ExTerm.Console.StringTracker do
     end
   end
 
-  @spec flush_updates(t) :: Range.t()
+  @spec flush_updates(state(insert)) :: Range.t()
+  @spec flush_updates(state(put)) :: :ok
+  @spec flush_updates(state(paint)) :: :ok
   # flush updates handles three cases depending on what the state of the string tracker
   # is.  If it's in string mode, then it immediately
   def flush_updates(tracker = %{mode: {:insert, from_row}, rows_inserted: rows}) do
@@ -165,6 +172,9 @@ defmodule ExTerm.Console.StringTracker do
     :ok
   end
 
+  @spec _blit_string_row(state(put), pos_integer, String.t) :: state(put) | state(paint)
+  @spec _blit_string_row(state(insert), pos_integer, String.t) :: state(insert) | state(paint)
+  @spec _blit_string_row(state(paint), pos_integer, String.t) :: state(paint)
   def _blit_string_row(tracker = %{cursor: {row, column}}, columns, "")
       when column !== 1 and column === columns + 1 do
     %{tracker | cursor: {row + 1, 1}}
@@ -211,10 +221,17 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   def _blit_string_row(tracker = %{cursor: cursor}, columns, string = "\e" <> _) do
-    case ExTerm.ANSI.parse(string, {tracker.style, cursor}) do
+    # TODO: refactor this to be less indirect
+    tracker.console
+    |> ANSI.new(tracker.style)
+    |> ANSI.parse(string, tracker.cursor, tracker.cells)
+    |> case do
       # no cursor change.
-      {rest, {style, ^cursor}} ->
-        _blit_string_row(%{tracker | style: style}, columns, rest)
+      {:style, ansi_state, rest} ->
+        _blit_string_row(%{tracker | style: ANSI.style(ansi_state)}, columns, rest)
+      {:update, new_cursor, changes, rest} ->
+        new_update = Update.merge_changes(tracker.update, changes)
+        _blit_string_row(%{tracker | cursor: new_cursor, update: new_update, cells: []}, columns, rest)
     end
   end
 
@@ -237,7 +254,7 @@ defmodule ExTerm.Console.StringTracker do
     %{tracker | cursor: new_cursor, update: %{tracker.update | cursor: new_cursor}}
   end
 
-  defp hard_return(tracker = %{cursor: {row, column}, mode: {:insert, start}}, columns)
+  defp hard_return(tracker = %{cursor: {row, column}, mode: {:insert, _start}}, columns)
        when column < columns do
     new_cells = Enum.reduce(column..columns, tracker.cells, &[{{row, &1}, %Cell{}} | &2])
 

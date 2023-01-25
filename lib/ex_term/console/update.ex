@@ -212,7 +212,7 @@ defmodule ExTerm.Console.Update do
 
     # be silent if no changes were made.
     unless update === %__MODULE__{cursor: nil, changes: []} do
-      Console.update_with(console, merge_cursor(update))
+      Console.broadcast(console, merge_cursor(update))
     end
 
     console
