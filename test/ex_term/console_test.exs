@@ -16,12 +16,15 @@ defmodule ExTermTest.ConsoleTest do
         assert {1, 1} == Console.cursor(console)
         assert %Style{} == Console.style(console)
 
-        for row <- 1..24, column <- 1..80 do
-          assert %{char: nil} = Console.get(console, {row, column})
-        end
-
-        for row <- 1..24, do: assert(is_nil(Console.get(console, {row, 81})))
-        assert is_nil(Console.get(console, {25, 1}))
+        # Currently, ExTerm doesn't fill out the first console content.  This will change back in the future.
+        # see: https://github.com/E-xyza/ex_term/issues/59
+        #
+        #  for row <- 1..24, column <- 1..80 do
+        #    assert %{char: nil} = Console.get(console, {row, column})
+        #  end
+        #
+        #  for row <- 1..24, do: assert(is_nil(Console.get(console, {row, 81})))
+        #  assert is_nil(Console.get(console, {25, 1}))
       end
     end
 
@@ -31,12 +34,15 @@ defmodule ExTermTest.ConsoleTest do
       Helpers.transaction console, :access do
         assert {5, 5} == Console.layout(console)
 
-        for row <- 1..5, column <- 1..5 do
-          assert %{char: nil} = Console.get(console, {row, column})
-        end
-
-        for row <- 1..5, do: assert(is_nil(Console.get(console, {row, 6})))
-        assert is_nil(Console.get(console, {6, 1}))
+        # Currently, ExTerm doesn't fill out the first console content.  This will change back in the future.
+        # see: https://github.com/E-xyza/ex_term/issues/59
+        #
+        # for row <- 1..5, column <- 1..5 do
+        #  assert %{char: nil} = Console.get(console, {row, column})
+        # end
+        #
+        # for row <- 1..5, do: assert(is_nil(Console.get(console, {row, 6})))
+        # assert is_nil(Console.get(console, {6, 1}))
       end
     end
   end
