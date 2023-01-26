@@ -488,7 +488,7 @@ defmodule ExTermTest.Console.UpdateTest do
     end
   end
 
-  describe "the augment_cell_change/2 function can merge succesive content" do
+  describe "the augment_cell_change/2 function can merge successive content" do
     test "location, location, location" do
       assert [{{1, 1}, {1, 3}}] === augment_cell_change([{1, 3}, {1, 1}], {1, 2})
     end

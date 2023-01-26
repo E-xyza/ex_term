@@ -189,7 +189,7 @@ defmodule ExTerm.Console.Update do
   To be used when tracking update changes in a custom fashion bypassing updates
   separate from the process dictionary.
 
-  Should always be suceeded by `merge/2`, which will merge these separate updates
+  Should always be succeeded by `merge/2`, which will merge these separate updates
   into the process dictionary
   """
   def merge_changes(update, change) when is_tuple(change) do

@@ -130,7 +130,7 @@ defmodule ExTerm.Console.Helpers do
   @doc """
   creates a function that is tagged as an access function.
 
-  If the application evironment variable `:exterm, :check_transaction` is set,
+  If the application environment variable `:exterm, :check_transaction` is set,
   and the function is not inside of a transaction, it will raise with an error.
 
   If you're developing exterm backends, you should have this environment
