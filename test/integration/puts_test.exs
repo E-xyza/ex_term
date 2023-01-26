@@ -64,5 +64,4 @@ defmodule ExTermTest.PutsTest do
       assert %Style{color: :blue} == FlokiTools.style_at(doc, 1, 4)
     end
   end
-
 end

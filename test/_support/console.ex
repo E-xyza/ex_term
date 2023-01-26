@@ -22,7 +22,8 @@ defmodule ExTermTest.Console do
         result = lambda.(payload)
         send(which, {:unblock, ref})
         result
-      after 1000 ->
+    after
+      1000 ->
         raise "did not receive a block message"
     end
   end

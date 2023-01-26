@@ -184,6 +184,10 @@ defmodule ExTerm.IexBackend.IOServer do
     {:noreply, Map.update!(state, :prompt, &Prompt.backspace/1)}
   end
 
+  defp special_keydown("Delete", state) do
+    {:noreply, Map.update!(state, :prompt, &Prompt.delete/1)}
+  end
+
   defp special_keydown("ArrowLeft", state) do
     {:noreply, Map.update!(state, :prompt, &Prompt.left/1)}
   end
