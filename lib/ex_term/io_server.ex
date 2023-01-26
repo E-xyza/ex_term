@@ -130,7 +130,7 @@ defmodule ExTerm.IOServer do
   end
 
   def marshal(_module, {:requests, []}, from, state, _) do
-    # this is only callable if the requests list is empty, which should not happpen.
+    # this is only callable if the requests list is empty, which should not happen.
     reply(from, {:error, :request})
     {:noreply, state}
   end

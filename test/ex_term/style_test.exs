@@ -109,7 +109,7 @@ defmodule ExTermTest.StyleTest do
     end
   end
 
-  describe "defauts:" do
+  describe "defaults:" do
     @default_color IO.ANSI.default_color() <> "text"
     test "default color works" do
       empty_css = %Style{}
