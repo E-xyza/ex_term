@@ -255,9 +255,16 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   # special events that are common
-  defp hard_tab(tracker = %{cursor: {row, column}}) do
+  defp hard_tab(tracker = %{cursor: {row, column}, last_cell: last_cell = {last_row, _}, layout: {_, layout_columns}, console: console}) do
+    new_last_cell = if row === last_row + 1 do
+      Console.new_row(console)
+      {row, layout_columns}
+    else
+      last_cell
+    end
+
     new_cursor = {row, tab_destination(column, 10)}
-    %{tracker | cursor: new_cursor, update: %{tracker.update | cursor: new_cursor}}
+    %{tracker | cursor: new_cursor, update: %{tracker.update | cursor: new_cursor}, last_cell: new_last_cell}
   end
 
   defp hard_return(tracker = %{cursor: {row, column}, mode: {:insert, _start}}, columns)
@@ -267,8 +274,16 @@ defmodule ExTerm.Console.StringTracker do
     %{tracker | cursor: {row + 1, 1}, cells: new_cells, rows_inserted: tracker.rows_inserted + 1}
   end
 
-  defp hard_return(tracker = %{cursor: {row, _}}, _) do
-    %{tracker | cursor: {row + 1, 1}, rows_inserted: tracker.rows_inserted + 1}
+  defp hard_return(tracker = %{cursor: {row, _}, last_cell: last_cell = {last_row, _}, console: console, layout: {_, layout_columns}, update: update}, _) do
+    {new_last_cell, new_update} =
+      if row === last_row + 1 do
+        Console.new_row(console)
+        {{row, layout_columns}, Update.merge_changes(update, {{row, 1}, :end})}
+      else
+        {last_cell, update}
+      end
+
+    %{tracker | cursor: {row + 1, 1}, rows_inserted: tracker.rows_inserted + 1, last_cell: new_last_cell, update: new_update}
   end
 
   defp tab_destination(column, tab_length) do
