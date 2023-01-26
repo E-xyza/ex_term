@@ -359,7 +359,7 @@ defmodule ExTerm.Console do
             [old_cursor]
 
           {last, false} ->
-            raise "cursor move to #{inspect(new_cursor)} exceeded the console buffer (#{move_msg(console, last, new_cursor)})"
+            raise "cursor move to #{inspect(new_cursor)} is out of bounds of the console: #{move_msg(console, last, new_cursor)}"
         end
 
       Update.change_cursor(new_cursor)
@@ -371,11 +371,11 @@ defmodule ExTerm.Console do
   end
 
   def move_msg(_, {last_row, _}, {cursor_row, _}) when cursor_row > last_row do
-    "cursor row #{cursor_row} is beyond the last console row #{last_row}"
+    "cursor row #{cursor_row} is beyond the last console row (#{last_row})"
   end
 
   def move_msg(console, _, {cursor_row, cursor_col}) do
-    "cursor column #{cursor_col} is beyond the last column of row #{cursor_row}: #{columns(console, cursor_row)}"
+    "cursor column #{cursor_col} is beyond the last column of row #{cursor_row} (#{columns(console, cursor_row)})"
   end
 
   # functional utilities
