@@ -12,7 +12,7 @@ defmodule ExTermTest.PutsTest do
     defp send_content_test(conn, content) do
       test_pid = self()
 
-      Mox.expect(ExTermTest.TerminalMock, :run, fn ->
+      Mox.expect(ExTermTest.TerminalMock, :run, fn _ ->
         IO.puts(content)
         Console.sync(test_pid)
         Console.hibernate()
@@ -47,7 +47,7 @@ defmodule ExTermTest.PutsTest do
     test "it can change the style", %{conn: conn} do
       test_pid = self()
 
-      Mox.expect(ExTermTest.TerminalMock, :run, fn ->
+      Mox.expect(ExTermTest.TerminalMock, :run, fn _ ->
         IO.puts("abc" <> IO.ANSI.blue() <> "def")
         Console.sync(test_pid)
         Console.hibernate()

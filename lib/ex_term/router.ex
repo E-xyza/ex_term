@@ -10,7 +10,7 @@ defmodule ExTerm.Router do
   defmacro live_term(route, module_or_opts, opts \\ [])
 
   defmacro live_term(route, module, opts) when is_atom(module) do
-    id = :erlang.phash2(__ENV__)
+    id = :erlang.phash2(Map.take(__CALLER__, [:file, :line]))
     pipeline_name = :"exterm-pipeline-#{id}"
 
     quote do
@@ -25,7 +25,7 @@ defmodule ExTerm.Router do
   end
 
   defmacro live_term(route, opts, []) when is_list(opts) do
-    id = :erlang.phash2(__CALLER__)
+    id = :erlang.phash2(Map.take(__CALLER__, [:file, :line]))
     pipeline_name = :"exterm-pipeline-#{id}"
 
     quote do

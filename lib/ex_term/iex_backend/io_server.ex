@@ -130,13 +130,13 @@ defmodule ExTerm.IexBackend.IOServer do
   end
 
   @impl IOServer
-  def handle_setopts(_, _, _state) do
-    {:error, :not_implemented}
+  def handle_setopts(_, _, state) do
+    {:error, :not_implemented, state}
   end
 
   @impl IOServer
-  def handle_getopts(_, _, _state) do
-    {:error, :not_implemented}
+  def handle_getopts(_, state) do
+    {:error, :not_implemented, state}
   end
 
   #############################################################################

@@ -24,6 +24,10 @@ defmodule ExTermWeb.Router do
   scope "/test" do
     pipe_through :browser
 
-    live_term "/", pubsub_server: ExTerm.PubSub, terminal: {ExTermTest.TerminalMock, :run, []}, layout: {5, 5}
+    live_term "/", pubsub_server: ExTerm.PubSub, terminal: {__MODULE__, :mocked, []}, layout: {5, 5}
+  end
+
+  def mocked() do
+    ExTermTest.TerminalMock.run(:erlang.group_leader())
   end
 end
