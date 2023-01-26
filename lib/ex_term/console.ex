@@ -186,11 +186,19 @@ defmodule ExTerm.Console do
     delete(console, key)
   end
 
-  def put_cell(console, location, char) do
-    Update.register_cell_change(console, location)
+  def put_cell(console, location = {row, column}, char) do
+    # verify that the location is inside the limits
+    case columns(console, row) do
+      0 ->
+        {last_row, _} = last_cell(console)
+        raise "location #{inspect location} is out of bounds of the console: row #{row} is beyond the last row (#{last_row})"
+      columns when column > columns ->
+        raise "location #{inspect location} is out of bounds of the console: column #{column} is beyond the last column in row #{row} (#{columns})"
+      _ -> :ok
+    end
 
-    console
-    |> insert({location, char})
+    Update.register_cell_change(console, location)
+    insert(console, {location, char})
   end
 
   defmatchspecp rows_from(starting_row) do
