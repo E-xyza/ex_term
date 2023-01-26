@@ -191,10 +191,14 @@ defmodule ExTerm.Console do
     case columns(console, row) do
       0 ->
         {last_row, _} = last_cell(console)
-        raise "location #{inspect location} is out of bounds of the console: row #{row} is beyond the last row (#{last_row})"
+
+        raise "location #{inspect(location)} is out of bounds of the console: row #{row} is beyond the last row (#{last_row})"
+
       columns when column > columns ->
-        raise "location #{inspect location} is out of bounds of the console: column #{column} is beyond the last column in row #{row} (#{columns})"
-      _ -> :ok
+        raise "location #{inspect(location)} is out of bounds of the console: column #{column} is beyond the last column in row #{row} (#{columns})"
+
+      _ ->
+        :ok
     end
 
     Update.register_cell_change(console, location)

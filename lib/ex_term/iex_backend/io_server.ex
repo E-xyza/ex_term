@@ -76,7 +76,22 @@ defmodule ExTerm.IexBackend.IOServer do
           {_, columns} when dimension === :columns -> columns
         end
 
-      {:ok, reply, state}
+      # Erlang documentation (https://www.erlang.org/doc/apps/stdlib/io_protocol.html#optional-i-o-request)
+      # here is incorrect.  It claims, The I/O server is to send the Reply as:
+      #
+      # ```
+      #   {ok, N}
+      #   {error, Error}
+      # ```
+      #
+      # this is incorrect, looking at the code here:
+      # https://github.com/erlang/otp/blob/a213a9a9541731f1f68a85d9cc14af9535d9be14/lib/stdlib/src/io.erl#L148-L154
+      # the I/O server is expecting a reply of just `N`.  Thus the following
+      # line of code is commented out.
+      #
+      # {:ok, reply, state}
+
+      {:reply, reply, state}
     end
   end
 
@@ -378,6 +393,8 @@ defmodule ExTerm.IexBackend.IOServer do
   # GENSERVER ROUTER
   @impl GenServer
   def handle_call(:console, from, state), do: console_impl(from, state)
+
+  @impl GenServer
   def handle_cast({:on_keydown, key}, state), do: on_keydown_impl(key, state)
   def handle_cast({:on_keyup, key}, state), do: on_keyup_impl(key, state)
   def handle_cast({:on_paste, string}, state), do: on_paste_impl(string, state)

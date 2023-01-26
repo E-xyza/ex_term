@@ -28,9 +28,9 @@ defmodule ExTermTest.ConsoleTest do
     test "you can customize the layout" do
       console = Console.new(layout: {5, 5})
 
-      assert {5, 5} == Console.layout(console)
-
       Helpers.transaction console, :access do
+        assert {5, 5} == Console.layout(console)
+
         for row <- 1..5, column <- 1..5 do
           assert %{char: nil} = Console.get(console, {row, column})
         end
