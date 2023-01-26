@@ -486,7 +486,7 @@ defmodule ExTerm.Console do
     |> :ets.select_count(ms)
   end
 
-  @spec select_from(t, Console.location) :: [cellinfo]
+  @spec select_from(t, Console.location()) :: [cellinfo]
   defaccess select_from(console, location) do
     console
     |> table

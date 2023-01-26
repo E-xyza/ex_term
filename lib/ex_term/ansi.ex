@@ -15,21 +15,21 @@ defmodule ExTerm.ANSI do
   defstruct @enforce_keys
 
   @opaque state :: %__MODULE__{
-    console: Console.t(),
-    style: Style.t
-  }
+            console: Console.t(),
+            style: Style.t()
+          }
 
-  @spec new(Console.t, Style.t) :: state
+  @spec new(Console.t(), Style.t()) :: state
   def new(console, style) do
     # note we can't trust the style in the console, it might be in the process of being
     # changed.
     %__MODULE__{
       console: console,
-      style: style,
+      style: style
     }
   end
 
-  @spec parse(state, String.t(), Console.location) :: {:style, state, String.t()}
+  @spec parse(state, String.t(), Console.location()) :: {:style, state, String.t()}
   def parse(state, string = "\e" <> _, cursor, changes) do
     with :not_style <- Style.from_ansi(state.style, string),
          :not_cursor <- Cursor.from_ansi(string, state.console, cursor, changes) do
@@ -37,6 +37,7 @@ defmodule ExTerm.ANSI do
     else
       {new_style = %Style{}, rest} ->
         {:style, %{state | style: new_style}, rest}
+
       update = {:update, _new_cursor, _updates, _rest} ->
         update
     end
@@ -44,6 +45,6 @@ defmodule ExTerm.ANSI do
 
   def parse(state, rest, _), do: {state, rest}
 
-  @spec style(state) :: Style.t
+  @spec style(state) :: Style.t()
   def style(state), do: state.style
 end

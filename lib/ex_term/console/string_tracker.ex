@@ -49,17 +49,17 @@ defmodule ExTerm.Console.StringTracker do
   @typep insert :: {:insert, from_row :: pos_integer()}
 
   @opaque state(mode_subtype) :: %__MODULE__{
-          console: Console.t(),
-          mode: mode_subtype,
-          style: Style.t(),
-          cursor: Console.location(),
-          old_cursor: Console.location(),
-          layout: Console.location(),
-          last_cell: Console.location(),
-          update: Update.t(),
-          cells: [Console.cellinfo()],
-          rows_inserted: pos_integer()
-        }
+            console: Console.t(),
+            mode: mode_subtype,
+            style: Style.t(),
+            cursor: Console.location(),
+            old_cursor: Console.location(),
+            layout: Console.location(),
+            last_cell: Console.location(),
+            update: Update.t(),
+            cells: [Console.cellinfo()],
+            rows_inserted: pos_integer()
+          }
 
   @opaque state() :: state(:put) | state(:paint) | state(:insert)
 
@@ -172,9 +172,9 @@ defmodule ExTerm.Console.StringTracker do
     :ok
   end
 
-  @spec _blit_string_row(state(put), pos_integer, String.t) :: state(put) | state(paint)
-  @spec _blit_string_row(state(insert), pos_integer, String.t) :: state(insert) | state(paint)
-  @spec _blit_string_row(state(paint), pos_integer, String.t) :: state(paint)
+  @spec _blit_string_row(state(put), pos_integer, String.t()) :: state(put) | state(paint)
+  @spec _blit_string_row(state(insert), pos_integer, String.t()) :: state(insert) | state(paint)
+  @spec _blit_string_row(state(paint), pos_integer, String.t()) :: state(paint)
   def _blit_string_row(tracker = %{cursor: {row, column}}, columns, "")
       when column !== 1 and column === columns + 1 do
     %{tracker | cursor: {row + 1, 1}}
@@ -229,9 +229,15 @@ defmodule ExTerm.Console.StringTracker do
       # no cursor change.
       {:style, ansi_state, rest} ->
         _blit_string_row(%{tracker | style: ANSI.style(ansi_state)}, columns, rest)
+
       {:update, new_cursor, changes, rest} ->
         new_update = Update.merge_changes(tracker.update, changes)
-        _blit_string_row(%{tracker | cursor: new_cursor, update: new_update, cells: []}, columns, rest)
+
+        _blit_string_row(
+          %{tracker | cursor: new_cursor, update: new_update, cells: []},
+          columns,
+          rest
+        )
     end
   end
 
