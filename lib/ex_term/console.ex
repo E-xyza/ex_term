@@ -316,30 +316,6 @@ defmodule ExTerm.Console do
     |> StringTracker.flush_updates()
   end
 
-  defmatchspecp cell_range_ms(row, column_start, row, column_end) do
-    tuple = {{^row, column}, _} when column >= column_start and column <= column_end -> tuple
-  end
-
-  defmatchspecp cell_range_ms(row_start, column_start, row_end, column_end)
-                when row_start + 1 === row_end do
-    tuple = {{^row_start, column}, cell} when column >= column_start ->
-      tuple
-
-    tuple = {{^row_end, column}, _} when column <= column_end ->
-      tuple
-  end
-
-  defmatchspecp cell_range_ms(row_start, column_start, row_end, column_end) do
-    tuple = {{^row_start, column}, cell} when column >= column_start ->
-      tuple
-
-    tuple = {{^row_end, column}, _} when column <= column_end ->
-      tuple
-
-    tuple = {{row, column}, cell} when row > row_start and row < row_end ->
-      tuple
-  end
-
   defmatchspecp cells_from(location) do
     tuple = {this, cell} when this >= location -> tuple
   end

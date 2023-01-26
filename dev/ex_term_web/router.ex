@@ -27,7 +27,7 @@ defmodule ExTermWeb.Router do
     live_term "/", pubsub_server: ExTerm.PubSub, terminal: {__MODULE__, :mocked, []}, layout: {5, 5}
   end
 
-  def mocked() do
-    ExTermTest.TerminalMock.run(:erlang.group_leader())
+  def mocked do
+    apply(ExTermTest.TerminalMock, :run [:erlang.group_leader()])
   end
 end

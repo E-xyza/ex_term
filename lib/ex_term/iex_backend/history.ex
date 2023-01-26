@@ -2,8 +2,6 @@ defmodule ExTerm.IexBackend.History do
   @moduledoc false
   @type t :: {past :: [String.t()], future :: [String.t()]}
 
-  alias ExTerm.IexBackend.Prompt
-
   def new, do: {[], []}
 
   @spec up(t, String.t() | nil) :: nil | {t, String.t()}
