@@ -17,7 +17,7 @@ defmodule ExTerm.TerminalBackend do
     #### Example
 
     ```
-    live_term "/", pubsub: MyWebApp.PubSub, io_server: MyIoServer
+    live_term "/", pubsub_server: MyWebApp.PubSub, io_server: MyIoServer
     ```
 
   ### TerminalBackend.IoServer specific
@@ -33,7 +33,7 @@ defmodule ExTerm.TerminalBackend do
     #### Example
 
     ```
-    live_term "/", pubsub: MyWebApp.PubSub, terminal: {MyModule, :run, []}
+    live_term "/", pubsub_server: MyWebApp.PubSub, terminal: {MyModule, :run, []}
     ```
   """
   alias ExTerm.Backend
@@ -49,10 +49,10 @@ defmodule ExTerm.TerminalBackend do
 
     {:ok, pid} = DynamicSupervisor.start_child(ExTerm.BackendSupervisor, {io_server, opts})
 
-    pubsub = Keyword.fetch!(opts, :pubsub)
+    pubsub_server = Keyword.fetch!(opts, :pubsub_server)
     pubsub_topic = io_server.pubsub_topic(pid)
 
-    PubSub.subscribe(pubsub, pubsub_topic)
+    PubSub.subscribe(pubsub_server, pubsub_topic)
 
     # monitor the process, LiveView should know when its child has died.
     Process.monitor(pid)

@@ -14,13 +14,13 @@ defmodule ExTermWeb.Router do
   scope "/" do
     pipe_through :browser
 
-    live_term "/", pubsub: ExTerm.PubSub
+    live_term "/", pubsub_server: ExTerm.PubSub
   end
 
   scope "/test" do
     pipe_through :browser
 
-    live_term "/", pubsub: ExTerm.PubSub, terminal: {__MODULE__, :mocked, []}, layout: {5, 5}
+    live_term "/", pubsub_server: ExTerm.PubSub, terminal: {__MODULE__, :mocked, []}, layout: {5, 5}
   end
 
   def mocked do

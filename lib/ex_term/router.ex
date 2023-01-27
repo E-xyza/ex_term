@@ -80,7 +80,7 @@ defmodule ExTerm.Router do
     scope "/live_term" do
       pipe_through :browser
 
-      live_term "/terminal", pubsub: MyAppWeb.PubSub
+      live_term "/terminal", pubsub_server: MyAppWeb.PubSub
     end
   end
   ```
@@ -96,14 +96,14 @@ defmodule ExTerm.Router do
   > to interface with other CLIs may be forthcoming.
 
   ```elixir
-  scope "/live_term", MyBackend, pubsub: MyAppWeb.PubSub
+  scope "/live_term", MyBackend, pubsub_server: MyAppWeb.PubSub
   ```
 
   ### Options
 
   #### Required options
 
-  - `:pubsub` A `Phoenix.Pubsub` server that will be used for Terminal backends to
+  - `:pubsub_server` A `Phoenix.Pubsub` server that will be used for Terminal backends to
     communicate back to the LiveView.
 
   #### Optional options

@@ -44,7 +44,7 @@ import ExTerm.Router
 scope "/live_term" do
   pipe_through :browser
 
-  live_term "/", pubsub: MyAppWeb.PubSub
+  live_term "/", pubsub_server: MyAppWeb.PubSub
 end
 ```
 

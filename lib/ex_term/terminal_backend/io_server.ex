@@ -23,13 +23,13 @@ defmodule ExTerm.TerminalBackend.IOServer do
 
   alias Phoenix.PubSub
 
-  @enforce_keys [:console, :pubsub, :pubsub_topic, :shell]
+  @enforce_keys [:console, :pubsub_server, :pubsub_topic, :shell]
   defstruct @enforce_keys ++
               [:prompt, buffer: KeyBuffer.new(), history: History.new(), flags: MapSet.new()]
 
   @type state :: %__MODULE__{
           console: Console.t(),
-          pubsub: module(),
+          pubsub_server: module(),
           pubsub_topic: String.t(),
           shell: pid,
           prompt: nil | GenServer.reply(),
@@ -46,9 +46,9 @@ defmodule ExTerm.TerminalBackend.IOServer do
   def init(opts) do
     # optional configuration: declare a lambda for an unconventional server
     terminal_runner = Keyword.get(opts, :terminal, fn -> IEx.Server.run([]) end)
-    pubsub = Keyword.fetch!(opts, :pubsub)
+    pubsub_server = Keyword.fetch!(opts, :pubsub_server)
     pubsub_topic = pubsub_topic(self())
-    opts = Keyword.merge(opts, handle_update: &broadcast_update(&1, pubsub, pubsub_topic))
+    opts = Keyword.merge(opts, handle_update: &broadcast_update(&1, pubsub_server, pubsub_topic))
 
     console = Console.new(opts)
 
@@ -61,7 +61,7 @@ defmodule ExTerm.TerminalBackend.IOServer do
     {:ok,
      %__MODULE__{
        console: console,
-       pubsub: pubsub,
+       pubsub_server: pubsub_server,
        pubsub_topic: pubsub_topic,
        shell: shell
      }}
@@ -112,7 +112,7 @@ defmodule ExTerm.TerminalBackend.IOServer do
         {:noreply, %{state | prompt: nil, buffer: new_buffer}}
 
       {:partial, partial, new_buffer} ->
-        broadcast_update({:prompt, :active}, state.pubsub, state.pubsub_topic)
+        broadcast_update({:prompt, :active}, state.pubsub_server, state.pubsub_topic)
 
         {:noreply,
          %{state | prompt: Prompt.new(from, cursor, partial, console), buffer: new_buffer}}
@@ -386,8 +386,8 @@ defmodule ExTerm.TerminalBackend.IOServer do
     |> String.replace_prefix("", "exterm:iex-backend:")
   end
 
-  defp broadcast_update(update, pubsub, pubsub_topic) do
-    PubSub.broadcast(pubsub, pubsub_topic, update)
+  defp broadcast_update(update, pubsub_server, pubsub_topic) do
+    PubSub.broadcast(pubsub_server, pubsub_topic, update)
   end
 
   # GENSERVER ROUTER

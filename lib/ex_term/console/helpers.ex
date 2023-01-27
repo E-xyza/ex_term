@@ -1,4 +1,8 @@
 defmodule ExTerm.Console.Helpers do
+  @moduledoc """
+  Contains macros which help write concise code for `ExTerm.Console` access.
+  """
+
   @check_transaction Application.compile_env(:ex_term, :check_transaction, false)
 
   @doc """
@@ -9,6 +13,9 @@ defmodule ExTerm.Console.Helpers do
   table with respect to other code guarded by this transaction macro.  code
   bundled in the `:access` type is not guaranteed to be transactional with
   respect to the ets table.
+
+  For mutations, this also dispatches the update function based on the lambda
+  stored in the `ExTerm.Console` table.
   """
   defmacro transaction(console, type, do: code) when type in [:mutate, :access] do
     import_statement =
@@ -130,7 +137,12 @@ defmodule ExTerm.Console.Helpers do
   @doc """
   creates a function that is tagged as an access function.
 
-  If the application environment variable `:exterm, :check_transaction` is set,
+  The associated console must be the first argument in the arguments list.
+  Generally, if you use the `ExTerm.Console` functions you won't need to use
+  this macro, but if you want to write your own primitives that wrap `:ets`
+  access functions, you should write the function using this macro.
+
+  If the application environment variable `:ex_term, :check_transaction` is set,
   and the function is not inside of a transaction, it will raise with an error.
 
   If you're developing exterm backends, you should have this environment
@@ -159,8 +171,18 @@ defmodule ExTerm.Console.Helpers do
   end
 
   @doc """
-  creates a function that is tagged as a mutation.  The console argument must be the
-  first argument.
+  creates a function that is tagged as a mutation.
+
+  The associated console must be the first argument in the arguments list.
+  Generally, if you use the `ExTerm.Console` functions you won't need to use
+  this macro, but if you want to write your own primitives that wrap `:ets`
+  mutation functions, you should write the function using this macro.
+
+  If the application environment variable `:ex_term, :check_transaction` is set,
+  and the function is not inside of a transaction, it will raise with an error.
+
+  If you're developing exterm backends, you should have this environment
+  variable set at a minimum in dev and test environments.
   """
   defmacro defmutate({name, _, args}, do: code) do
     check_transaction =
