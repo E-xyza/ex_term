@@ -2,39 +2,51 @@
 
 ![tests](https://github.com/e-xyza/ex_term/actions/workflows/test_flow.yml/badge.svg)
 
-## Description
-
-ExTerm is an IEx console LiveView component.  The IEx console is responsible for converting your
-interactions with the browser into erlang IO protocol so that you can execute code from your
-browser.
+ExTerm is an terminal `Phoenix.LiveView` component.  ExTerm is responsible
+for converting erlang IO protocol messages into web output and translating
+web input into responses in the IO protocol.
 
 ## Installation
 
-1. Add ExTerm to your mix.exs:
+Add ExTerm to your mix.exs:
 
 ```elixir
 
 def deps do
-  [
-    # ...
-    {:ex_term, "~> 0.2"}
-    # ...
-  ]
+[
+  # ...
+  {:ex_term, "~> 0.2"}
+  # ...
+]
 end
 ```
 
-1. Create a live view in your routes
-  - as a standalone liveview
+```elixir
 
-    ```elixir
-    import ExTerm.Router
+def deps do
+[
+  # ...
+  {:ex_term, "~> 0.2"}
+  # ...
+]
+end
+```
 
-    scope "/" do
-      pipe_through :browser
-  
-      live_term "/", pubsub_server: MyAppWeb.PubSub
-    end
-    ```
+### How to create a live terminal in your Phoenix router
+
+You must supply a `Phoenix.PubSub` server that is the communication channel
+to send important updates to the liveview.  It's recommended to use the
+PubSub server associated with your web server.
+
+```elixir
+import ExTerm.Router
+
+scope "/" do
+  pipe_through :browser
+
+  live_term "/", pubsub_server: MyAppWeb.PubSub
+end
+```
 
 ## Documentation
 

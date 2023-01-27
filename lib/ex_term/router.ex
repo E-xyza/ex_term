@@ -1,7 +1,36 @@
 defmodule ExTerm.Router do
   @behaviour Plug
 
-  def init(opts), do: opts
+  alias ExTerm.CSS
+  require CSS
+
+  @css_builtins CSS.builtins()
+
+  def init([module | opts]) do
+    new_opts = opts
+    |> Keyword.put_new(:css, :default)
+    |> Enum.map(fn
+      {:css, builtin} when builtin in @css_builtins ->
+        {:css, Map.fetch!(CSS.default_css_map(), builtin)}
+
+      {:css, {:priv, app, file_path}} ->
+        css_content =
+          app
+          |> :code.priv_dir()
+          |> Path.join(file_path)
+          |> File.read!()
+
+        {:css, css_content}
+
+      {:css, option} ->
+        raise "unsupported CSS option #{inspect(option)}, must a default atom (one of #{inspect(@css_builtins)}) or `{:priv, app, path}`"
+
+      other ->
+        other
+    end)
+
+    [module | new_opts]
+  end
 
   def call(conn, [module | opts]) do
     Plug.Conn.put_session(conn, "exterm-backend", {module, opts})
