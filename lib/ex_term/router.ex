@@ -30,7 +30,7 @@ defmodule ExTerm.Router do
 
     quote do
       pipeline unquote(pipeline_name) do
-        plug ExTerm.Router, [ExTerm.IexBackend | unquote(opts)]
+        plug ExTerm.Router, [ExTerm.TerminalBackend | unquote(opts)]
       end
 
       pipe_through unquote(pipeline_name)

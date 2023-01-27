@@ -1,4 +1,4 @@
-defmodule ExTerm.IexBackend.IOServer do
+defmodule ExTerm.TerminalBackend.IOServer do
   @moduledoc false
 
   # This module is an implementation of the erlang io protocol.  Details of the
@@ -14,9 +14,9 @@ defmodule ExTerm.IexBackend.IOServer do
 
   alias ExTerm.Console
   alias ExTerm.Console.Helpers
-  alias ExTerm.IexBackend.History
-  alias ExTerm.IexBackend.KeyBuffer
-  alias ExTerm.IexBackend.Prompt
+  alias ExTerm.TerminalBackend.History
+  alias ExTerm.TerminalBackend.KeyBuffer
+  alias ExTerm.TerminalBackend.Prompt
   alias ExTerm.TerminalSupervisor
 
   require Helpers

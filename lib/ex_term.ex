@@ -13,40 +13,51 @@ defmodule ExTerm do
   ```elixir
 
   def deps do
-    [
-      # ...
-      {:ex_term, "~> 0.1"}
-      # ...
-    ]
+  [
+    # ...
+    {:ex_term, "~> 0.2"}
+    # ...
+  ]
   end
   ```
 
-  2. Create a live view in your routes
-    - as a standalone liveview
+  Create a live view in your routes
+  - with the default backend and default terminal
 
-      ```elixir
-      scope "/" do
-        pipe_through :browser
-        pipe_through :extra_authorization
+    ```elixir
+    import ExTerm.Router
 
-        live "/", ExTerm
-      end
-      ```
+    scope "/" do
+      pipe_through :browser
 
-    - you can also use it as a live component!
+      live_term "/", pubsub_server: MyAppWeb.PubSub
+    end
+    ```
 
-      ```elixir
-      <.live_component module={ExTerm}/>
-      ```
+  - with the default backend and a custom interaction layer
 
-  ### Not implemented yet (soon):
-  - up arrow (history)
-  - tab completion
-  - copy/paste
+    ```elixir
+    import ExTerm.Router
 
-  ### Planned (Pro?) features:
-  - provenance tracking
-  - multiplayer mode
+    scope "/" do
+      pipe_through :browser
+
+      live_term "/", pubsub_server: MyAppWeb.PubSub, terminal: {__MODULE__, :function, []}
+    end
+    ```
+
+  - with a custom backend
+
+
+    ```elixir
+    import ExTerm.Router
+
+    scope "/" do
+      pipe_through :browser
+
+      live_term "/", MyBackend, pubsub_server: MyAppWeb.PubSub
+    end
+    ```
   """
 
   alias ExTerm.Console

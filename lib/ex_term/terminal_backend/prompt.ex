@@ -1,4 +1,4 @@
-defmodule ExTerm.IexBackend.Prompt do
+defmodule ExTerm.TerminalBackend.Prompt do
   @moduledoc false
 
   alias ExTerm.Console

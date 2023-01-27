@@ -1,5 +1,6 @@
-defmodule ExTerm.IexBackend do
-  @moduledoc false
+defmodule ExTerm.TerminalBackend do
+  @moduledoc """
+  """
 
   alias ExTerm.Backend
   alias Phoenix.PubSub
@@ -9,7 +10,7 @@ defmodule ExTerm.IexBackend do
 
   @impl Backend
   def on_connect(_params, %{"exterm-backend" => {__MODULE__, opts}}, socket) do
-    io_server = Keyword.get(opts, :io_server, ExTerm.IexBackend.IOServer)
+    io_server = Keyword.get(opts, :io_server, ExTerm.TerminalBackend.IOServer)
     opts = Keyword.put(opts, :callers, [self() | Process.get(:"$callers", [])])
 
     {:ok, pid} = DynamicSupervisor.start_child(ExTerm.BackendSupervisor, {io_server, opts})

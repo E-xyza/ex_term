@@ -1,4 +1,4 @@
-defmodule ExTerm.IexBackend.History do
+defmodule ExTerm.TerminalBackend.History do
   @moduledoc false
   @type t :: {past :: [String.t()], future :: [String.t()]}
 

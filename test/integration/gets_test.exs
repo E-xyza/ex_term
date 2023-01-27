@@ -30,7 +30,7 @@ defmodule ExTermTest.GetsTest do
     {:ok, view, _html} = live(conn, "/test")
 
     Console.unblock(fn {:group_leader, pid} ->
-      topic = ExTerm.IexBackend.IOServer.pubsub_topic(pid)
+      topic = ExTerm.TerminalBackend.IOServer.pubsub_topic(pid)
       PubSub.subscribe(ExTerm.PubSub, topic)
     end)
 
@@ -77,7 +77,7 @@ defmodule ExTermTest.GetsTest do
       {:ok, view, _html} = live(conn, "/test")
 
       Console.unblock(fn {:group_leader, pid} ->
-        topic = ExTerm.IexBackend.IOServer.pubsub_topic(pid)
+        topic = ExTerm.TerminalBackend.IOServer.pubsub_topic(pid)
         PubSub.subscribe(ExTerm.PubSub, topic)
 
         # run this stuff before we run "io.gets"
