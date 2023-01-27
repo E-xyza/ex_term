@@ -6,8 +6,8 @@ defmodule ExTerm.MixProject do
   def project do
     [
       app: :ex_term,
-      version: "0.1.0",
-      elixir: "~> 1.12",
+      version: "0.2.0",
+      elixir: "~> 1.14",
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: Mix.compilers(),
       start_permanent: Mix.env() == :prod,
@@ -53,7 +53,8 @@ defmodule ExTerm.MixProject do
       {:jason, "~> 1.2"},
       {:plug_cowboy, "~> 2.5", optional: !in_dev},
       {:mix_test_watch, "~> 1.1", only: :dev, runtime: false},
-      {:ex_doc, "> 0.0.0", only: :dev, runtime: false}
+      {:ex_doc, "> 0.0.0", only: :dev, runtime: false},
+      {:credo, "~> 1.6", only: [:dev, :test], runtime: false}
     ]
   end
 

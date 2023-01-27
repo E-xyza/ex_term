@@ -76,7 +76,22 @@ defmodule ExTerm.IexBackend.IOServer do
           {_, columns} when dimension === :columns -> columns
         end
 
-      {:ok, reply, state}
+      # Erlang documentation (https://www.erlang.org/doc/apps/stdlib/io_protocol.html#optional-i-o-request)
+      # here is incorrect.  It claims, The I/O server is to send the Reply as:
+      #
+      # ```
+      #   {ok, N}
+      #   {error, Error}
+      # ```
+      #
+      # this is incorrect, looking at the code here:
+      # https://github.com/erlang/otp/blob/a213a9a9541731f1f68a85d9cc14af9535d9be14/lib/stdlib/src/io.erl#L148-L154
+      # the I/O server is expecting a reply of just `N`.  Thus the following
+      # line of code is commented out.
+      #
+      # {:ok, reply, state}
+
+      {:reply, reply, state}
     end
   end
 
@@ -130,13 +145,13 @@ defmodule ExTerm.IexBackend.IOServer do
   end
 
   @impl IOServer
-  def handle_setopts(_, _, _state) do
-    {:error, :not_implemented}
+  def handle_setopts(_, _, state) do
+    {:error, :not_implemented, state}
   end
 
   @impl IOServer
-  def handle_getopts(_, _, _state) do
-    {:error, :not_implemented}
+  def handle_getopts(_, state) do
+    {:error, :not_implemented, state}
   end
 
   #############################################################################
@@ -182,6 +197,10 @@ defmodule ExTerm.IexBackend.IOServer do
 
   defp special_keydown("Backspace", state) do
     {:noreply, Map.update!(state, :prompt, &Prompt.backspace/1)}
+  end
+
+  defp special_keydown("Delete", state) do
+    {:noreply, Map.update!(state, :prompt, &Prompt.delete/1)}
   end
 
   defp special_keydown("ArrowLeft", state) do
@@ -286,7 +305,7 @@ defmodule ExTerm.IexBackend.IOServer do
   defp find_spacing(options, count) do
     options
     |> Enum.map(&(length(&1) + 1))
-    |> Enum.max
+    |> Enum.max()
     |> case do
       divisible when rem(divisible, count) === 0 -> divisible
       other -> other + count - rem(other, count)
@@ -302,27 +321,36 @@ defmodule ExTerm.IexBackend.IOServer do
 
   defp tab_table(console, opts = [this | rest], {row, col}, spacing, columns, so_far) do
     # get the length of the current row
-    columns = case Console.columns(console, row) do
-      0 -> columns
-      exists -> exists
-    end
+    columns =
+      case Console.columns(console, row) do
+        0 -> columns
+        exists -> exists
+      end
 
-    case next_spacing(col, this, spacing)  do
+    case next_spacing(col, this, spacing) do
       next when col === 1 and next >= columns + 1 ->
         {truncated, leftover} = Enum.split(this, columns)
-        tab_table(console, [leftover | rest], {row + 1, 1}, spacing, columns, [?\n, truncated | so_far])
+
+        tab_table(console, [leftover | rest], {row + 1, 1}, spacing, columns, [
+          ?\n,
+          truncated | so_far
+        ])
+
       next when next === columns + 1 ->
         tab_table(console, rest, {row + 1, 1}, spacing, columns, [?\n, this | so_far])
+
       next when next > columns ->
         tab_table(console, rest, {row + 1, 1}, spacing, columns, opts)
+
       next when next <= columns ->
-        new_this = this |> IO.iodata_to_binary |> String.pad_trailing(spacing)
+        new_this = this |> IO.iodata_to_binary() |> String.pad_trailing(spacing)
         tab_table(console, rest, {row, next}, spacing, columns, [new_this | so_far])
     end
   end
 
   defp next_spacing(col, this, spacing) do
     length = length(this) + 1
+
     case col + length do
       s when rem(s, spacing) === 1 -> s
       s when rem(s, spacing) === 0 -> s + 1
@@ -365,6 +393,8 @@ defmodule ExTerm.IexBackend.IOServer do
   # GENSERVER ROUTER
   @impl GenServer
   def handle_call(:console, from, state), do: console_impl(from, state)
+
+  @impl GenServer
   def handle_cast({:on_keydown, key}, state), do: on_keydown_impl(key, state)
   def handle_cast({:on_keyup, key}, state), do: on_keyup_impl(key, state)
   def handle_cast({:on_paste, string}, state), do: on_paste_impl(string, state)

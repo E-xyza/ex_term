@@ -2,11 +2,19 @@ defmodule ExTermTest.FocusTest do
   use ExUnit.Case, async: true
   use ExTermWeb.ConnCase
 
+  alias ExTermTest.Console
+
   import Phoenix.LiveViewTest
 
   setup %{conn: conn} do
-    Mox.stub_with(IEx.Server.Mock, IEx.Server.Original)
-    {:ok, view, html} = live(conn, "/")
+    test_pid = self()
+
+    Mox.expect(ExTermTest.TerminalMock, :run, fn _ ->
+      Console.sync(test_pid)
+      Console.hibernate()
+    end)
+
+    {:ok, view, html} = live(conn, "/test")
     {:ok, view: view, html: html}
   end
 
@@ -18,6 +26,7 @@ defmodule ExTermTest.FocusTest do
       |> Floki.attribute("class")
 
     assert classes =~ "exterm-blurred"
+    Console.unblock()
   end
 
   test "getting focus sets the class to focused", %{view: view} do
@@ -30,6 +39,7 @@ defmodule ExTermTest.FocusTest do
       |> Floki.attribute("class")
 
     assert classes =~ "exterm-focused"
+    Console.unblock()
   end
 
   test "losing focus sets the class to blurred again", %{view: view} do
@@ -46,5 +56,6 @@ defmodule ExTermTest.FocusTest do
       |> Floki.attribute("class")
 
     assert classes =~ "exterm-blurred"
+    Console.unblock()
   end
 end

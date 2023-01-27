@@ -3,7 +3,7 @@ defmodule ExTerm.TerminalSupervisor do
 
   # defdelegate child_spec(params), to: Task.Supervisor
 
-  def child_spec(params) do
+  def child_spec(_params) do
     %{
       id: __MODULE__,
       start: {__MODULE__, :start_link, [[]]},

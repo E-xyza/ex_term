@@ -9,21 +9,25 @@ defmodule ExTerm.Console.Cursor do
   @clear IO.ANSI.clear()
   @clear_line IO.ANSI.clear_line()
 
-  @spec from_ansi(String.t, Console.t, Console.location, to_flush :: Update.cell_changes) ::
-    :not_cursor | {:update, Console.location, Update.t, String.t}
+  @spec from_ansi(String.t(), Console.t(), Console.location(), to_flush :: Update.cell_changes()) ::
+          :not_cursor | {:update, Console.location(), Update.t(), String.t()}
 
   def from_ansi(@home <> rest, console, {cursor_row, _}, changes) do
     Console.insert(console, changes)
     {rows, cols} = Console.layout(console)
-    updates = Enum.flat_map((cursor_row + 1)..(cursor_row + rows), fn row ->
-      case Console.columns(console, row) do
-        0 ->
-          # doesn't exist.  Fill it out to the layout length, pad with sentinel.
-          [{{row, cols + 1}, Cell.sentinel()} | Enum.map(1..cols, &{{row, &1}, %Cell{}})]
-        length ->
-          Enum.map(1..length, &{{row, &1}, %Cell{}})
-      end
-    end)
+
+    updates =
+      Enum.flat_map((cursor_row + 1)..(cursor_row + rows), fn row ->
+        case Console.columns(console, row) do
+          0 ->
+            # doesn't exist.  Fill it out to the layout length, pad with sentinel.
+            [{{row, cols + 1}, Cell.sentinel()} | Enum.map(1..cols, &{{row, &1}, %Cell{}})]
+
+          length ->
+            Enum.map(1..length, &{{row, &1}, %Cell{}})
+        end
+      end)
+
     Console.insert(console, updates)
     new_cursor = {cursor_row + 1, 1}
     {:update, new_cursor, {new_cursor, :end}, rest}

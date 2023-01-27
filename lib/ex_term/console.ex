@@ -186,11 +186,23 @@ defmodule ExTerm.Console do
     delete(console, key)
   end
 
-  def put_cell(console, location, char) do
-    Update.register_cell_change(console, location)
+  def put_cell(console, location = {row, column}, char) do
+    # verify that the location is inside the limits
+    case columns(console, row) do
+      0 ->
+        {last_row, _} = last_cell(console)
 
-    console
-    |> insert({location, char})
+        raise "location #{inspect(location)} is out of bounds of the console: row #{row} is beyond the last row (#{last_row})"
+
+      columns when column > columns ->
+        raise "location #{inspect(location)} is out of bounds of the console: column #{column} is beyond the last column in row #{row} (#{columns})"
+
+      _ ->
+        :ok
+    end
+
+    Update.register_cell_change(console, location)
+    insert(console, {location, char})
   end
 
   defmatchspecp rows_from(starting_row) do
@@ -304,30 +316,6 @@ defmodule ExTerm.Console do
     |> StringTracker.flush_updates()
   end
 
-  defmatchspecp cell_range_ms(row, column_start, row, column_end) do
-    tuple = {{^row, column}, _} when column >= column_start and column <= column_end -> tuple
-  end
-
-  defmatchspecp cell_range_ms(row_start, column_start, row_end, column_end)
-                when row_start + 1 === row_end do
-    tuple = {{^row_start, column}, cell} when column >= column_start ->
-      tuple
-
-    tuple = {{^row_end, column}, _} when column <= column_end ->
-      tuple
-  end
-
-  defmatchspecp cell_range_ms(row_start, column_start, row_end, column_end) do
-    tuple = {{^row_start, column}, cell} when column >= column_start ->
-      tuple
-
-    tuple = {{^row_end, column}, _} when column <= column_end ->
-      tuple
-
-    tuple = {{row, column}, cell} when row > row_start and row < row_end ->
-      tuple
-  end
-
   defmatchspecp cells_from(location) do
     tuple = {this, cell} when this >= location -> tuple
   end
@@ -347,7 +335,7 @@ defmodule ExTerm.Console do
             [old_cursor]
 
           {last, false} ->
-            raise "cursor move to #{inspect(new_cursor)} exceeded the console buffer (#{move_msg(console, last, new_cursor)})"
+            raise "cursor move to #{inspect(new_cursor)} is out of bounds of the console: #{move_msg(console, last, new_cursor)}"
         end
 
       Update.change_cursor(new_cursor)
@@ -359,11 +347,11 @@ defmodule ExTerm.Console do
   end
 
   def move_msg(_, {last_row, _}, {cursor_row, _}) when cursor_row > last_row do
-    "cursor row #{cursor_row} is beyond the last console row #{last_row}"
+    "cursor row #{cursor_row} is beyond the last console row (#{last_row})"
   end
 
   def move_msg(console, _, {cursor_row, cursor_col}) do
-    "cursor column #{cursor_col} is beyond the last column of row #{cursor_row}: #{columns(console, cursor_row)}"
+    "cursor column #{cursor_col} is beyond the last column of row #{cursor_row} (#{columns(console, cursor_row)})"
   end
 
   # functional utilities
@@ -486,7 +474,7 @@ defmodule ExTerm.Console do
     |> :ets.select_count(ms)
   end
 
-  @spec select_from(t, Console.location) :: [cellinfo]
+  @spec select_from(t, Console.location()) :: [cellinfo]
   defaccess select_from(console, location) do
     console
     |> table

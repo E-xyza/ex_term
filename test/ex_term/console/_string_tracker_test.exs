@@ -55,17 +55,17 @@ defmodule ExTermTest.Console.StringTrackerTest do
 
         tracker = StringTracker.new(console)
 
-        assert {%{
-                  cursor: {2, 1},
-                  update: %{changes: [{{1, 1}, {1, :end}}]},
-                  cells: [
-                    {{1, 5}, %{char: "a"}},
-                    {{1, 4}, %{char: "b"}},
-                    {{1, 3}, %{char: "o"}},
-                    {{1, 2}, %{char: "o"}},
-                    {{1, 1}, %{char: "f"}}
-                  ]
-                }, ""} = StringTracker._blit_string_row(tracker, 5, "fooba")
+        assert %{
+                 cursor: {2, 1},
+                 update: %{changes: [{{1, 1}, {1, 5}}]},
+                 cells: [
+                   {{1, 5}, %{char: "a"}},
+                   {{1, 4}, %{char: "b"}},
+                   {{1, 3}, %{char: "o"}},
+                   {{1, 2}, %{char: "o"}},
+                   {{1, 1}, %{char: "f"}}
+                 ]
+               } = StringTracker._blit_string_row(tracker, 5, "fooba")
 
         refute Console.get(console, {2, 1})
       end
@@ -202,7 +202,7 @@ defmodule ExTermTest.Console.StringTrackerTest do
 
         assert %{
                  cursor: {1, 10},
-                 update: %{cursor: {1, 10}, changes: [{{1, 1}, :end}]},
+                 update: %{cursor: {1, 10}, changes: []},
                  last_cell: {1, 20},
                  cells: []
                } = StringTracker._blit_string_row(tracker, 20, "\t")

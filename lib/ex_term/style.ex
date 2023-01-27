@@ -185,8 +185,9 @@ defmodule ExTerm.Style do
   @colors ~w(color background-color)a
   defp kv_to_css(key, value) when key in @colors do
     case value do
-      nil -> []
-      
+      nil ->
+        []
+
       _ when is_atom(value) ->
         [to_string(key), ":var(--exterm-", to_string(value), ");"]
 
@@ -229,10 +230,10 @@ defmodule ExTerm.Style do
     end
   end
 
-  @color_mapping Map.new(@named_colors, fn color -> {"#{color}", color} end)
+  @color_mapping Map.new(@named_colors, fn color -> {"--exterm-#{color}", color} end)
   @named_color_strings Map.keys(@color_mapping)
   defp color_from_prop(color) when color in @named_color_strings do
-    @color_mapping[color]
+    Map.fetch!(@color_mapping, color)
   end
 end
 

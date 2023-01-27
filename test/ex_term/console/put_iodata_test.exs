@@ -1,8 +1,7 @@
-defmodule ExTermTest.Console.PutStringTest do
+defmodule ExTermTest.Console.PutIodataTest do
   use ExUnit.Case, async: true
 
   alias ExTerm.Console
-  alias ExTerm.Console.Cell
   alias ExTerm.Console.Helpers
 
   require Console
@@ -65,7 +64,7 @@ defmodule ExTermTest.Console.PutStringTest do
         Console.put_iodata(console, "fooba")
       end
 
-      assert_receive %{cursor: {2, 1}, changes: [{{1, 1}, {1, :end}}]}
+      assert_receive %{cursor: {2, 1}, changes: [{{1, 1}, {2, 1}}]}
 
       Helpers.transaction console, :access do
         assert %{char: "f"} = Console.get(console, {1, 1})
@@ -85,7 +84,7 @@ defmodule ExTermTest.Console.PutStringTest do
         Console.put_iodata(console, "foobar")
       end
 
-      assert_receive %{cursor: {2, 2}, changes: [{{1, 1}, {2, :end}}]}
+      assert_receive %{cursor: {2, 2}, changes: [{{1, 1}, :end}]}
 
       Helpers.transaction console, :access do
         assert %{char: "f"} = Console.get(console, {1, 1})
@@ -108,7 +107,7 @@ defmodule ExTermTest.Console.PutStringTest do
           Console.put_iodata(console, "foo#{unquote(return)}bar")
         end
 
-        assert_receive %{cursor: {2, 4}, changes: [{{1, 1}, {2, :end}}]}
+        assert_receive %{cursor: {2, 4}, changes: [{{1, 1}, :end}]}
 
         Helpers.transaction console, :access do
           assert %{char: "f"} = Console.get(console, {1, 1})
@@ -133,7 +132,7 @@ defmodule ExTermTest.Console.PutStringTest do
         Console.put_iodata(console, "foo\n")
       end
 
-      assert_receive %{cursor: {2, 1}, changes: [{{1, 1}, {1, :end}}]}
+      assert_receive %{cursor: {2, 1}, changes: [{{1, 1}, :end}]}
     end
 
     test "ANSI code can change the style", %{console: console} do
@@ -149,7 +148,5 @@ defmodule ExTermTest.Console.PutStringTest do
         assert %{char: "o", style: %{color: :red}} = Console.get(console, {1, 3})
       end
     end
-
-    test "ANSI code can change the cursor location"
   end
 end

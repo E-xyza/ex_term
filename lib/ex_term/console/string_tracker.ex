@@ -49,17 +49,17 @@ defmodule ExTerm.Console.StringTracker do
   @typep insert :: {:insert, from_row :: pos_integer()}
 
   @opaque state(mode_subtype) :: %__MODULE__{
-          console: Console.t(),
-          mode: mode_subtype,
-          style: Style.t(),
-          cursor: Console.location(),
-          old_cursor: Console.location(),
-          layout: Console.location(),
-          last_cell: Console.location(),
-          update: Update.t(),
-          cells: [Console.cellinfo()],
-          rows_inserted: pos_integer()
-        }
+            console: Console.t(),
+            mode: mode_subtype,
+            style: Style.t(),
+            cursor: Console.location(),
+            old_cursor: Console.location(),
+            layout: Console.location(),
+            last_cell: Console.location(),
+            update: Update.t(),
+            cells: [Console.cellinfo()],
+            rows_inserted: pos_integer()
+          }
 
   @opaque state() :: state(:put) | state(:paint) | state(:insert)
 
@@ -172,9 +172,9 @@ defmodule ExTerm.Console.StringTracker do
     :ok
   end
 
-  @spec _blit_string_row(state(put), pos_integer, String.t) :: state(put) | state(paint)
-  @spec _blit_string_row(state(insert), pos_integer, String.t) :: state(insert) | state(paint)
-  @spec _blit_string_row(state(paint), pos_integer, String.t) :: state(paint)
+  @spec _blit_string_row(state(put), pos_integer, String.t()) :: state(put) | state(paint)
+  @spec _blit_string_row(state(insert), pos_integer, String.t()) :: state(insert) | state(paint)
+  @spec _blit_string_row(state(paint), pos_integer, String.t()) :: state(paint)
   def _blit_string_row(tracker = %{cursor: {row, column}}, columns, "")
       when column !== 1 and column === columns + 1 do
     %{tracker | cursor: {row + 1, 1}}
@@ -220,7 +220,7 @@ defmodule ExTerm.Console.StringTracker do
     {hard_return(tracker, columns), rest}
   end
 
-  def _blit_string_row(tracker = %{cursor: cursor}, columns, string = "\e" <> _) do
+  def _blit_string_row(tracker, columns, string = "\e" <> _) do
     # TODO: refactor this to be less indirect
     tracker.console
     |> ANSI.new(tracker.style)
@@ -229,9 +229,15 @@ defmodule ExTerm.Console.StringTracker do
       # no cursor change.
       {:style, ansi_state, rest} ->
         _blit_string_row(%{tracker | style: ANSI.style(ansi_state)}, columns, rest)
+
       {:update, new_cursor, changes, rest} ->
         new_update = Update.merge_changes(tracker.update, changes)
-        _blit_string_row(%{tracker | cursor: new_cursor, update: new_update, cells: []}, columns, rest)
+
+        _blit_string_row(
+          %{tracker | cursor: new_cursor, update: new_update, cells: []},
+          columns,
+          rest
+        )
     end
   end
 
@@ -249,9 +255,30 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   # special events that are common
-  defp hard_tab(tracker = %{cursor: {row, column}}) do
+  defp hard_tab(
+         tracker = %{
+           cursor: {row, column},
+           last_cell: last_cell = {last_row, _},
+           layout: {_, layout_columns},
+           console: console
+         }
+       ) do
+    new_last_cell =
+      if row === last_row + 1 do
+        Console.new_row(console)
+        {row, layout_columns}
+      else
+        last_cell
+      end
+
     new_cursor = {row, tab_destination(column, 10)}
-    %{tracker | cursor: new_cursor, update: %{tracker.update | cursor: new_cursor}}
+
+    %{
+      tracker
+      | cursor: new_cursor,
+        update: %{tracker.update | cursor: new_cursor},
+        last_cell: new_last_cell
+    }
   end
 
   defp hard_return(tracker = %{cursor: {row, column}, mode: {:insert, _start}}, columns)
@@ -261,8 +288,31 @@ defmodule ExTerm.Console.StringTracker do
     %{tracker | cursor: {row + 1, 1}, cells: new_cells, rows_inserted: tracker.rows_inserted + 1}
   end
 
-  defp hard_return(tracker = %{cursor: {row, _}}, _) do
-    %{tracker | cursor: {row + 1, 1}, rows_inserted: tracker.rows_inserted + 1}
+  defp hard_return(
+         tracker = %{
+           cursor: {row, _},
+           last_cell: last_cell = {last_row, _},
+           console: console,
+           layout: {_, layout_columns},
+           update: update
+         },
+         _
+       ) do
+    {new_last_cell, new_update} =
+      if row === last_row + 1 do
+        Console.new_row(console)
+        {{row, layout_columns}, Update.merge_changes(update, {{row, 1}, :end})}
+      else
+        {last_cell, update}
+      end
+
+    %{
+      tracker
+      | cursor: {row + 1, 1},
+        rows_inserted: tracker.rows_inserted + 1,
+        last_cell: new_last_cell,
+        update: new_update
+    }
   end
 
   defp tab_destination(column, tab_length) do

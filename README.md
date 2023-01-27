@@ -1,5 +1,7 @@
 # ExTerm
 
+![tests](https://github.com/e-xyza/ex_term/actions/workflows/test_flow.yml/badge.svg)
+
 ## Description
 
 ExTerm is an IEx console LiveView component.  The IEx console is responsible for converting your

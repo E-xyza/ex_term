@@ -44,7 +44,7 @@ defmodule ExTermTest.FlokiTools do
   end
 
   def char_at(content, row, column) do
-    [{"div", _, cell_content}] = Floki.find(content, "#exterm-cell-#{row}-#{column}")
+    [{"span", _, cell_content}] = Floki.find(content, "#exterm-cell-#{row}-#{column}")
     IO.iodata_to_binary(cell_content)
   end
 

@@ -36,7 +36,7 @@ defmodule ExTerm.IexBackend.Prompt do
   def delete(prompt = %{postcursor: []}), do: prompt
 
   def delete(prompt) do
-    paint(%{prompt | postcursor: tl(prompt.precursor)}, " ")
+    paint(%{prompt | postcursor: tl(prompt.postcursor)}, " ")
   end
 
   def left(prompt = %{precursor: []}), do: prompt
@@ -70,7 +70,7 @@ defmodule ExTerm.IexBackend.Prompt do
     nil
   end
 
-  def paste(prompt = %{console: console}, content) do
+  def paste(prompt, content) do
     precursor =
       content
       |> breakdown
