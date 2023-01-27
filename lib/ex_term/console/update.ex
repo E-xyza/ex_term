@@ -21,6 +21,8 @@ defmodule ExTerm.Console.Update do
   use MatchSpec
 
   @typedoc """
+  struct which describes the update information
+
   ### fields
   - `cursor`:  nil if there is no change in the cursor location, new cursor
     `t:Console.location/0` otherwise.
@@ -125,6 +127,10 @@ defmodule ExTerm.Console.Update do
   defguardp col(location) when elem(location, 1)
 
   @spec register_cell_change(Console.t(), cell_change | cell_changes) :: Console.t()
+  @doc """
+  adds a cell change or set of cell changes into the update that is stored in
+  the current process dictionary.
+  """
   def register_cell_change(console, cell_changes) do
     # check to see if the column is at the end of its row, in which case, amend
     # it to be a "row/end", for the purposes of compaction.
@@ -140,6 +146,13 @@ defmodule ExTerm.Console.Update do
   end
 
   @spec change_cursor(Console.location()) :: :ok
+  @doc """
+  records changing the cursor into update.
+
+  Does not add this into the chnages list due to the fact that the cursor may
+  change again before the update needs to be dispatched.  The cursor position
+  may be added prior to dispatch using `merge_cursor/1`
+  """
   def change_cursor(location) do
     get_current_update()
     |> Map.put(:cursor, location)
@@ -149,6 +162,9 @@ defmodule ExTerm.Console.Update do
   end
 
   @spec set_insertion(Range.t()) :: :ok
+  @doc """
+  records a range to declare as the insertion range
+  """
   def set_insertion(range) do
     get_current_update()
     |> Map.put(:insertion, range)
@@ -230,6 +246,10 @@ defmodule ExTerm.Console.Update do
     tuple = {location, _} when location >= start -> tuple
   end
 
+  @doc """
+  obtains the cells from a console datastructure corresponding to the `:changes`
+  field.
+  """
   def get(%{changes: changes}, console) do
     consolidated_matchspec =
       changes

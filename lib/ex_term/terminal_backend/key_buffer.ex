@@ -1,4 +1,4 @@
-defmodule ExTerm.IexBackend.KeyBuffer do
+defmodule ExTerm.TerminalBackend.KeyBuffer do
   @moduledoc false
 
   # keybuffer is a list of keys that have been entered into the buffer already.

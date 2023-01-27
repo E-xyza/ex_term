@@ -21,19 +21,28 @@ defmodule ExTerm.CSS do
   @moduledoc false
   use Phoenix.LiveComponent
 
-  @exterm_css Path.join(__DIR__, "../_css/default.css")
-  @external_resource @exterm_css
-  @css File.read!(@exterm_css)
+  # compile-time access to the default css content
+  @builtin_path Path.join(__DIR__, "../_css")
+  @builtins @builtin_path
+            |> File.ls!()
+            |> Enum.map(&String.to_atom(Path.rootname(&1)))
+  @builtin_css_map Map.new(@builtins, &{&1, File.read!(Path.join(@builtin_path, "#{&1}.css"))})
+
+  # private accessor functions available to the Router plug.
+  def builtins, do: @builtins
 
   def render(assigns) do
-    css =
-      case Map.fetch(assigns, :css) do
-        {:ok, true} -> @css
-        {:ok, css} -> css
-        _ -> ""
-      end
+    assigns =
+      Map.update!(assigns, :css, fn
+        builtin when builtin in @builtins ->
+          Map.fetch!(@builtin_css_map, builtin)
 
-    assigns = %{css: css}
+        {:priv, app, file} ->
+          :ex_term
+          |> Application.fetch_env!(app)
+          |> List.keyfind!(file, 0)
+          |> elem(1)
+      end)
 
     ~H"""
     <style>

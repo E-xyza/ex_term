@@ -2,3 +2,6 @@
 
 ## 0.1.0
 - basic functionality, still missing features!
+
+## 0.2.0
+- complete refactor, implements basic terminal and proper integration

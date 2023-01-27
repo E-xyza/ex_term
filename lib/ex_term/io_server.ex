@@ -5,9 +5,9 @@ defmodule ExTerm.IOServer do
 
   https://www.erlang.org/doc/apps/stdlib/io_protocol.html
 
-  Note that ExTerm does NOT require you to implement an IOServer; you can also
-  implement it as a process-less module attached to the LiveView using the
-  backend module itself.
+  > #### Warning {: .warning}
+  >
+  > This module may be broken out into its own library in the future.
   """
 
   defmacro __using__(opts) do
@@ -66,13 +66,98 @@ defmodule ExTerm.IOServer do
           | noreply
           | stop(type)
 
+  @doc """
+  responds to `{:put_chars, encoding, characters}` and `{:put_chars, encoding, module, function, args}`
+  requests.
+
+  In the case `module`, `function` and `args` are provided, these are merged
+  into a single tuple and passed as the second parameter.
+
+  This request expects a reply of `:ok` or `{:error, error}` in one of the
+  following ways:
+  - `{:ok, state}` return value
+  - `{:error, error, state}` return value
+  - `{:reply, reply, state, ...}` return value
+  - `{:noreply, state, ...}` return followed by `reply(from, reply)` asynchronously.
+  """
   @callback handle_put(encoding, iodata | mfargs, from, state) :: basic_response()
+
+  @doc """
+  responds to `:get_until`, `:get_chars`, and `:get_line` requests in a single interface.
+
+  These requests constitute:
+  - `{:get_until, encoding, prompt, module, function, extraargs}`
+  - `{:get_chars, encoding, prompt, count}`
+  - `{:get_line, encoding, prompt}`
+
+  The `get_condition` is packaged in the following ways:
+  - for `:get_until`, it is passed as `{:until, {module, function, args}}`.
+  - for `:get_chars`, it is passed as `{:chars, count}`
+  - for `:get_line`, it is passed as `:line`
+
+  This request expects a reply of `data` `:eof` or `{:error, error}` in one of the
+  following ways:
+  - `{:error, error, state}` return value
+  - `{:reply, reply, state, ...}` return value
+  - `{:noreply, state, ...}` return followed by `reply(from, reply)` asynchronously.
+
+  > #### Tip {: .info}
+  >
+  > Typically for this function, an asynchronous response is expected.
+  """
   @callback handle_get(encoding, prompt :: iodata, get_condition, from, state) ::
               response(get_reply)
+
+  @doc """
+  responds to `{:setopts, options}` requests.
+
+  This request expects a reply of `:ok` or `{:error, error}` in one of the
+  following ways:
+  - `{:ok, state}` return value
+  - `{:error, error, state}` return value
+  - `{:reply, reply, state, ...}` return value
+  - `{:noreply, state, ...}` return followed by `reply(from, reply)` asynchronously.
+  """
   @callback handle_setopts(opts, from, state) :: basic_response()
+
+  @doc """
+  responds to `:getopts` requests.
+
+  This request expects a reply of `keywordlist` or `{:error, error}` in one of
+  the following ways:
+  - `{:error, error, state}` return value
+  - `{:reply, reply, state, ...}` return value
+  - `{:noreply, state, ...}` return followed by `reply(from, reply)` asynchronously.
+  """
   @callback handle_getopts(from, state) :: response(keyword)
+
+  @doc """
+  responds to `{:get_geometry, geometry}` requests, where geometry may be
+  either `:rows` or `:columns`
+
+  This request expects a reply of `integer` or `{:error, error}` in one of the
+  following ways:
+  - `{:error, error, state}` return value
+  - `{:reply, reply, state, ...}` return value
+  - `{:noreply, state, ...}` return followed by `reply(from, reply)` asynchronously.
+  """
   @callback handle_geometry(geometry, from, state) :: response(non_neg_integer())
+
+  @doc """
+  responds to other requests, these may not be defined at the time and may come
+  in a future IO protocol spec.
+
+  A default implementation is provided which emits an standard response for
+  forwards compatibility.
+  """
   @callback handle_request(term, from, state) :: response(term)
+
+  @doc """
+  responds to other messages.
+
+  Since IOServer takes over the `c:GenServer.handle_info/2` callback, this callback
+  can be used to listen to other messages.
+  """
   @callback handle_message(term, state) :: noreply | {:stop, reason :: term, state}
   @optional_callbacks [handle_request: 3, handle_message: 2]
 

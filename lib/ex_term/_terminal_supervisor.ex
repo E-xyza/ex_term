@@ -1,7 +1,6 @@
 defmodule ExTerm.TerminalSupervisor do
+  @moduledoc false
   def start_link(opts), do: Task.Supervisor.start_link(opts ++ [name: __MODULE__])
-
-  # defdelegate child_spec(params), to: Task.Supervisor
 
   def child_spec(_params) do
     %{

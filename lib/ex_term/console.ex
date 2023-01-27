@@ -2,6 +2,11 @@ defmodule ExTerm.Console do
   @moduledoc """
   A datastructure which describes in-memory storage of console information.
 
+  > ### Important {: .info}
+  >
+  > Understanding this datastructure and its associated functions is critical
+  > to implementing a custom ExTerm backend.
+
   Console information consists of the following:
 
   - buffer of all rows/columns so far.
@@ -15,6 +20,18 @@ defmodule ExTerm.Console do
   across a cluster.  Note that console is not backed by a process, but it is the
   responsibility of a process; if that process dies, the console will get destroyed,
   and by default mutating functions cannot be called from other processes.
+
+  ### Inside the table
+
+  the table contains metadata of the form `{atom, term}`, and cells of the form
+  `{{row, column}, %ExTerm.Console.Cell{}}`.  The table is sorted on term order;
+  this preserves lexicographical order over the cells, and the metadata precede
+  all of the cells.
+
+  Note that every row contains an extra "sentinel" cell at the end which needs
+  to be displayed on the console.  This sentinel serves to record the length of
+  the row, and also creates line breaks in the terminal div by being a
+  "preformatted" hard return.
   """
 
   use Phoenix.Component
@@ -27,20 +44,34 @@ defmodule ExTerm.Console do
 
   import ExTerm.Console.Helpers
 
-  @type permission :: :private | :protected | :public
+  @typedoc """
+  descriptor for a console, which stores a the permission information,
+  a reference to the table, and a write semaphore (if the table is public)
+  """
   @opaque t ::
             {:private | :protected, pid, :ets.table()}
             | {:public, pid, :ets.table(), :atomics.atomics_ref()}
-  @type location :: {pos_integer(), pos_integer()}
-  @type layout :: location | {0, 0}
-  @type update ::
-          {:xterm_console_update, from :: location, to :: location, cursor :: location,
-           last_cell :: location}
+
+  @typedoc """
+  coordinate information for a character in the console.
+  """
+  @type location :: {row :: pos_integer(), column :: pos_integer()}
+
+  @typedoc """
+  the layout of the console, which should corresppond to the number of rows
+  and columns in the primary view of the console in html.
+  """
+  @type layout :: location
+
+  @typedoc """
+  the contents of the "cells" section of the table.
+  """
   @type cellinfo :: {location, Cell.t()}
 
   ############################################################################
   ## rendering function
 
+  @doc false
   def render(assigns) do
     ~H"""
     <div id="exterm-console" phx-update="append" data-exterm-cursor-row={elem(@cursor, 0)} data-exterm-cursor-column={elem(@cursor, 1)}>
@@ -81,25 +112,36 @@ defmodule ExTerm.Console do
   #############################################################################
   ## GUARDS
 
+  @doc false
   defguard permission(console) when elem(console, 0)
 
+  @doc false
   defguard custodian(console) when elem(console, 1)
 
+  @doc false
   defguard spinlock(console) when elem(console, 3)
 
+  @doc false
   defguard is_access_ok(console)
            when permission(console) in [:public, :protected] or self() === custodian(console)
 
+  @doc false
   defguard is_mutate_ok(console)
            when permission(console) === :public or self() === custodian(console)
 
+  @doc false
   defguard is_local(console) when node(custodian(console)) === node()
 
+  @doc false
   defguard location(cellinfo) when elem(cellinfo, 0)
 
   #############################################################################
   ## CONSOLE ETS interactions
 
+  @doc """
+  initalizes a new console.  The argument, which should be a keyword list, will
+  be put into the console metadata.
+  """
   def new(opts \\ []) do
     permission = Keyword.get(opts, :permission, :protected)
     layout = Keyword.get(opts, :layout, {24, 80})
@@ -122,14 +164,29 @@ defmodule ExTerm.Console do
     end
   end
 
+  @doc """
+  obtains the layout metadata
+
+  *this function must be in an access transaction*
+  """
   def layout(console) do
     get_metadata(console, :layout)
   end
 
+  @doc """
+  obtains the cursor metadata
+
+  *this function must be in an access transaction*
+  """
   def cursor(console) do
     get_metadata(console, :cursor)
   end
 
+  @doc """
+  obtains the style metadata
+
+  *this function must be in an access transaction*
+  """
   def style(console) do
     get_metadata(console, :style)
   end
@@ -142,6 +199,11 @@ defmodule ExTerm.Console do
     {^location, cell} -> cell
   end
 
+  @doc """
+  retrieves the cell info (location + cell contents) for the console location
+
+  *this function must be in an access transaction*
+  """
   def get(console, location) when Update.is_location(location) do
     console
     |> select(get_ms(location))
@@ -174,18 +236,40 @@ defmodule ExTerm.Console do
 
   # basic mutations
 
+  @doc """
+  puts a single k/v into the metadata store
+
+  *this function must be in a mutation transaction*
+  """
   def put_metadata(console, key, value) do
     insert(console, [{key, value}])
   end
 
+  @doc """
+  puts multiple k/v into the metadata store (as a keyword list)
+
+  *this function must be in a mutation transaction*
+  """
   def put_metadata(console, keyword) do
     insert(console, keyword)
   end
 
+  @doc """
+  removes a key from the metadata store
+
+  *this function must be in a mutation transaction*
+  """
   def delete_metadata(console, key) do
     delete(console, key)
   end
 
+  @doc """
+  puts a single cell onto the console, using absolute row position.
+
+  Does not change the cursor location.
+
+  *this function must be in a mutation transaction*
+  """
   def put_cell(console, location = {row, column}, char) do
     # verify that the location is inside the limits
     case columns(console, row) do
@@ -209,6 +293,12 @@ defmodule ExTerm.Console do
     tuple = {{row, _}, cell} when row >= starting_row -> tuple
   end
 
+  @doc """
+  inserts a new row into the console, either at a given location, given by an
+  integer, or at the end, given by `:end` atom.
+
+  *this function must be in a mutation transaction*
+  """
   def new_row(console, insertion_at \\ :end)
 
   def new_row(console, :end) do
@@ -285,6 +375,8 @@ defmodule ExTerm.Console do
 
   @doc """
   `inserts` iodata at the location of a cursor.
+
+  *this function must be in an mutation transaction*
   """
   def put_iodata(console, iodata) do
     console
@@ -300,6 +392,8 @@ defmodule ExTerm.Console do
   If the current cursor precedes the insertion point, it will be unaffected.
   If the current cursor is after the insertion point, it will be displaced
   as many lines as are necessary
+
+  *this function must be in an mutation transaction*
   """
   def insert_iodata(console, iodata, row) do
     # the claim here is that everything after a given location must be broadcast.
@@ -346,11 +440,11 @@ defmodule ExTerm.Console do
     end
   end
 
-  def move_msg(_, {last_row, _}, {cursor_row, _}) when cursor_row > last_row do
+  defp move_msg(_, {last_row, _}, {cursor_row, _}) when cursor_row > last_row do
     "cursor row #{cursor_row} is beyond the last console row (#{last_row})"
   end
 
-  def move_msg(console, _, {cursor_row, cursor_col}) do
+  defp move_msg(console, _, {cursor_row, cursor_col}) do
     "cursor column #{cursor_col} is beyond the last column of row #{cursor_row} (#{columns(console, cursor_row)})"
   end
 
@@ -391,6 +485,8 @@ defmodule ExTerm.Console do
   Does not include the sentinel in the final count.
 
   If the row doesn't exist, returns 0.
+
+  *this function must be in an access transaction*
   """
   def columns(console, row) do
     select_count(console, column_count_ms(row))
@@ -401,12 +497,19 @@ defmodule ExTerm.Console do
   returns a full row, in ascending order.
 
   May include the sentinel, if `with_sentinel?` is `true` (defaults to `false`)
+
+  *this function must be in an access transaction*
   """
   def full_row(console, row, with_sentinel? \\ false) do
     select(console, full_row_ms(row, with_sentinel?))
   end
 
   @spec has?(t, location) :: boolean
+  @doc """
+  returns if a location is present in the console
+
+  *this function must be in an access transaction*
+  """
   def has?(console, location) do
     not is_nil(lookup(console, location))
   end
@@ -416,6 +519,8 @@ defmodule ExTerm.Console do
   returns true if the cell exists and the location is on the last column of its
   row, not inclusive of the sentinel.  Note this returns false if it's the
   sentinel.
+
+  *this function must be in an access transaction*
   """
   def last_column?(console, {row, column}) do
     match?({_, %{char: "\n"}}, lookup(console, {row, column + 1}))
@@ -429,6 +534,8 @@ defmodule ExTerm.Console do
   on the end of the cell.
 
   If the table is empty and only contains metadata, returns `{0, 0}`
+
+  *this function must be in an access transaction*
   """
   def last_cell(console) do
     # the last key in the table encodes the last row because the ordered
@@ -443,6 +550,11 @@ defmodule ExTerm.Console do
   # generic access functions
 
   @spec last(t) :: location | atom
+  @doc """
+  primitive `:ets` last function
+
+  *this function must be in an access transaction*
+  """
   defaccess last(console) do
     console
     |> table()
@@ -450,6 +562,11 @@ defmodule ExTerm.Console do
   end
 
   @spec lookup(t, location) :: cellinfo | nil
+  @doc """
+  primitive `:ets` lookup function
+
+  *this function must be in an access transaction*
+  """
   defaccess lookup(console, location) do
     console
     |> table()
@@ -461,6 +578,11 @@ defmodule ExTerm.Console do
   end
 
   @spec select(t, :ets.match_spec()) :: [cellinfo]
+  @doc """
+  primitive `:ets` select function
+
+  *this function must be in an access transaction*
+  """
   defaccess select(console, ms) do
     console
     |> table()
@@ -468,6 +590,11 @@ defmodule ExTerm.Console do
   end
 
   @spec select_count(t, :ets.match_spec()) :: non_neg_integer
+  @doc """
+  primitive `:ets` select_count function
+
+  *this function must be in an access transaction*
+  """
   defaccess select_count(console, ms) do
     console
     |> table
@@ -475,6 +602,11 @@ defmodule ExTerm.Console do
   end
 
   @spec select_from(t, Console.location()) :: [cellinfo]
+  @doc """
+  primitive `:ets` select function that selects cells from a location inclusive
+
+  *this function must be in an access transaction*
+  """
   defaccess select_from(console, location) do
     console
     |> table
@@ -482,6 +614,11 @@ defmodule ExTerm.Console do
   end
 
   @spec insert(t, tuple | [tuple]) :: t
+  @doc """
+  primitive `:ets` insert function
+
+  *this function must be in a mutation transaction*
+  """
   defmutate insert(console, content) do
     console
     |> table()
@@ -491,6 +628,11 @@ defmodule ExTerm.Console do
   end
 
   @spec delete(t, atom) :: t
+  @doc """
+  primitive `:ets` delete function
+
+  *this function must be in a mutation transaction*
+  """
   defmutate delete(console, key) do
     console
     |> table
@@ -500,7 +642,7 @@ defmodule ExTerm.Console do
   end
 
   # other commonly usable functions
-  def make_blank_row(row, columns) do
+  defp make_blank_row(row, columns) do
     [
       {{row, columns + 1}, Cell.sentinel()}
       | for column <- 1..columns do

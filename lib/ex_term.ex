@@ -2,51 +2,93 @@ defmodule ExTerm do
   @moduledoc """
   ## Description
 
-  ExTerm is an IEx console LiveView component.  The IEx console is responsible for converting your
-  interactions with the browser into erlang IO protocol so that you can execute code from your
-  browser.
+  ExTerm is an terminal `Phoenix.LiveView` component.  ExTerm is responsible
+  for converting erlang IO protocol messages into web output and translating
+  web input into responses in the IO protocol.
 
   ## Installation
 
-  1. Add ExTerm to your mix.exs:
+  Add ExTerm to your mix.exs:
 
   ```elixir
 
   def deps do
-    [
-      # ...
-      {:ex_term, "~> 0.1"}
-      # ...
-    ]
+  [
+    # ...
+    {:ex_term, "~> 0.2"}
+    # ...
+  ]
   end
   ```
 
-  2. Create a live view in your routes
-    - as a standalone liveview
+  ### How to create a live terminal in your Phoenix router
 
-      ```elixir
-      scope "/" do
-        pipe_through :browser
-        pipe_through :extra_authorization
+  ExTerm provides the convenience helper `ExTerm.Router.live_term/3` that you
+  can use to create a live view route.
 
-        live "/", ExTerm
-      end
-      ```
+  You must supply a `Phoenix.PubSub` server that is the communication channel
+  to send important updates to the liveview.  It's recommended to use the
+  PubSub server associated with your web server.
 
-    - you can also use it as a live component!
+  The default backend is `ExTerm.TerminalBackend` and the default terminal is
+  `IEx.Server`.  Both of these are customizable.
 
-      ```elixir
-      <.live_component module={ExTerm}/>
-      ```
+  - with the default backend and default terminal
 
-  ### Not implemented yet (soon):
-  - up arrow (history)
-  - tab completion
-  - copy/paste
+    ```elixir
+    import ExTerm.Router
 
-  ### Planned (Pro?) features:
-  - provenance tracking
-  - multiplayer mode
+    scope "/live_term" do
+      pipe_through :browser
+
+      live_term "/", pubsub_server: MyAppWeb.PubSub
+    end
+    ```
+
+  - with the default backend and a custom interaction layer
+
+    ```elixir
+    import ExTerm.Router
+
+    scope "/live_term" do
+      pipe_through :browser
+
+      live_term "/", pubsub_server: MyAppWeb.PubSub, terminal: {__MODULE__, :function, []}
+    end
+    ```
+
+  - with a custom backend
+
+
+    ```elixir
+    import ExTerm.Router
+
+    scope "/live_term" do
+      pipe_through :browser
+
+      live_term "/", MyBackend, pubsub_server: MyAppWeb.PubSub
+    end
+    ```
+
+  ### Customizing layout (CSS)
+
+  You can customize the css for the layout, by providing either a builtin
+  layout option or providing your own.  To use a builtin layout, pass the
+  layout name `:default` or `:bw` (for black and white console text) as
+  the css option, as follows:
+
+  ```elixir
+    live_term "/", pubsub_server: MyAppWeb.PubSub, css: :bw
+  ```
+
+  To use a custom layout, put the layout file in the `priv` directory of your
+  applicatyon and pass the relative path as follows:
+
+  ```elixir
+    live_term "/", MyBackend, pubsub_server: MyAppWeb.PubSub, css: {:priv, my_app, "path/to/my_layout.css"}
+  ```
+
+  Note that this content must be available at compile time.
   """
 
   alias ExTerm.Console
@@ -61,6 +103,7 @@ defmodule ExTerm do
 
   use Phoenix.LiveView
 
+  @doc false
   def render(assigns) do
     ~H"""
     <div id="exterm-terminal" contenteditable spellcheck="false" class={class_for(@focus)} phx-keydown="keydown" phx-focus="focus" phx-blur="blur" tabindex="0">
@@ -82,7 +125,10 @@ defmodule ExTerm do
     end
   end
 
+  @doc false
   def mount(params, session = %{"exterm-backend" => {backend, opts}}, socket) do
+    css = Keyword.fetch!(opts, :css)
+
     if connected?(socket) do
       case backend.on_connect(params, session, socket) do
         {:ok, console, socket} ->
@@ -100,38 +146,26 @@ defmodule ExTerm do
               {{row, column}, %Cell{char: if(column === sentinel_column, do: "\n")}}
             end
 
-          css =
-            case Keyword.fetch(opts, :css) do
-              :error ->
-                true
-
-              {:ok, {:file, file}} ->
-                File.read!(file)
-
-              {:ok, content} when is_binary(content) ->
-                content
-            end
-
           new_socket =
             socket
-            |> init(console)
-            |> assign(backend: backend, cells: cells, css: css)
+            |> init(css, console)
+            |> assign(backend: backend, cells: cells)
 
           {:ok, new_socket, temporary_assigns: [cells: []]}
       end
     else
-      {:ok, init(socket), temporary_assigns: [cells: []]}
+      {:ok, init(socket, css), temporary_assigns: [cells: []]}
     end
   end
 
   # reducers
-  defp init(socket, console \\ nil) do
+  defp init(socket, css, console \\ nil) do
     socket
+    |> assign(:css, css)
     |> set_cursor
     |> set_focus
     |> set_prompt
     |> set_console(console)
-    |> set_css(true)
   end
 
   defp set_cursor(socket, cursor \\ {1, 1}) do
@@ -161,12 +195,9 @@ defmodule ExTerm do
     assign(socket, console: console)
   end
 
-  defp set_css(socket, css) do
-    assign(socket, css: css)
-  end
-
   # handlers
 
+  @doc false
   def handle_event("focus", _payload, socket) do
     case socket.assigns.focus do
       false ->
@@ -203,9 +234,15 @@ defmodule ExTerm do
     socket.assigns.backend.on_paste(string, socket)
   end
 
-  def handle_event(type, payload, socket) do
-    socket.assigns.backend.handle_event(type, payload, socket)
+  def handle_event(type, payload, socket = %{assigns: %{backend: backend}}) do
+    if function_exported?(backend, :on_event, 3) do
+      socket.assigns.backend.on_event(type, payload, socket)
+    else
+      {:noreply, socket}
+    end
   end
+
+  @doc false
 
   def handle_info(update = %Update{}, socket = %{assigns: %{console: console}}) do
     cells =

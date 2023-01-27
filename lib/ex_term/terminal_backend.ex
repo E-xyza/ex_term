@@ -1,6 +1,41 @@
-defmodule ExTerm.IexBackend do
-  @moduledoc false
+defmodule ExTerm.TerminalBackend do
+  @moduledoc """
+  Default backend that creates a `ExTerm.IoServer` process and forwards all
+  callbacks to its wrapping module.  By default, this is set to
+  `ExTerm.TerminalBackend.IoServer`.
 
+  ### TerminalBackend specific options:
+
+  This option can be set in the router declaration (see `ExTerm.Router`)
+
+  - `:io_server` a module, should be a supervisable `GenServer` which
+    satisfies a minimal set of `ExTerm.IoServer` callbacks.  The required
+    implementations are as follows:
+
+    - *list coming in v 0.3.0*
+
+    #### Example
+
+    ```
+    live_term "/", pubsub_server: MyWebApp.PubSub, io_server: MyIoServer
+    ```
+
+  ### TerminalBackend.IoServer specific
+
+  This option can be set in the router declaration (see `ExTerm.Router`)
+
+  - `:terminal` a (module, function, args) for the function that should be
+    run inside of the terminal task.  This should be a REPL that takes over
+    the task, and typically will be an infinite loop (return type `no_return`).
+    If the function terminates, the io server will suffer a fatal error and
+    the terminal liveview will be rendered unusable.
+
+    #### Example
+
+    ```
+    live_term "/", pubsub_server: MyWebApp.PubSub, terminal: {MyModule, :run, []}
+    ```
+  """
   alias ExTerm.Backend
   alias Phoenix.PubSub
   import Phoenix.Component
@@ -9,7 +44,7 @@ defmodule ExTerm.IexBackend do
 
   @impl Backend
   def on_connect(_params, %{"exterm-backend" => {__MODULE__, opts}}, socket) do
-    io_server = Keyword.get(opts, :io_server, ExTerm.IexBackend.IOServer)
+    io_server = Keyword.get(opts, :io_server, ExTerm.TerminalBackend.IOServer)
     opts = Keyword.put(opts, :callers, [self() | Process.get(:"$callers", [])])
 
     {:ok, pid} = DynamicSupervisor.start_child(ExTerm.BackendSupervisor, {io_server, opts})

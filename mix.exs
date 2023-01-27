@@ -19,7 +19,7 @@ defmodule ExTerm.MixProject do
       docs: [
         main: "ExTerm",
         extras: ["README.md"],
-        filter_modules: fn module, _ -> module == ExTerm end
+        filter_modules: fn module, _ -> match?(["ExTerm" | _], Module.split(module)) end
       ]
     ]
   end
