@@ -1,5 +1,5 @@
 defmodule ExTerm.Console.Cursor do
-  @doc false
+  @moduledoc false
   alias ExTerm.Console
   alias ExTerm.Console.Cell
   alias ExTerm.Console.Update
