@@ -5,7 +5,7 @@ import Config
 config :ex_term, ExTermWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "JF508wY58zm85QD5zUDQffsi91vvxJ9K+RY2SLfI7n3TZk5ITte042COtDpb/oRg",
-  server: false
+  server: true
 
 config :ex_term, :io_server, IEx.Server.Mock
 

@@ -28,6 +28,6 @@ defmodule ExTermWeb.Router do
   end
 
   def mocked do
-    apply(ExTermTest.TerminalMock, :run [:erlang.group_leader()])
+    apply(ExTermTest.TerminalMock, :run, [:erlang.group_leader()])
   end
 end
