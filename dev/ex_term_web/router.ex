@@ -11,20 +11,16 @@ defmodule ExTermWeb.Router do
     plug :put_secure_browser_headers
   end
 
-  pipeline :api do
-    plug :accepts, ["json"]
-  end
-
   scope "/" do
     pipe_through :browser
 
-    live_term "/", pubsub_server: ExTerm.PubSub
+    live_term "/", pubsub: ExTerm.PubSub
   end
 
   scope "/test" do
     pipe_through :browser
 
-    live_term "/", pubsub_server: ExTerm.PubSub, terminal: {__MODULE__, :mocked, []}, layout: {5, 5}
+    live_term "/", pubsub: ExTerm.PubSub, terminal: {__MODULE__, :mocked, []}, layout: {5, 5}
   end
 
   def mocked do

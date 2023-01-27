@@ -2,6 +2,11 @@ defmodule ExTerm.Console do
   @moduledoc """
   A datastructure which describes in-memory storage of console information.
 
+  > ### Important {: .info}
+  >
+  > Understanding this datastructure and its associated functions is critical
+  > to implementing a custom ExTerm backend.
+
   Console information consists of the following:
 
   - buffer of all rows/columns so far.
@@ -15,6 +20,18 @@ defmodule ExTerm.Console do
   across a cluster.  Note that console is not backed by a process, but it is the
   responsibility of a process; if that process dies, the console will get destroyed,
   and by default mutating functions cannot be called from other processes.
+
+  ### Inside the table
+
+  the table contains metadata of the form `{atom, term}`, and cells of the form
+  `{{row, column}, %ExTerm.Console.Cell{}}`.  The table is sorted on term order;
+  this preserves lexicographical order over the cells, and the metadata precede
+  all of the cells.
+
+  Note that every row contains an extra "sentinel" cell at the end which needs
+  to be displayed on the console.  This sentinel serves to record the length of
+  the row, and also creates line breaks in the terminal div by being a
+  "preformatted" hard return.
   """
 
   use Phoenix.Component
@@ -27,15 +44,28 @@ defmodule ExTerm.Console do
 
   import ExTerm.Console.Helpers
 
-  @type permission :: :private | :protected | :public
+  @typedoc """
+  descriptor for a console, which stores a the permission information,
+  a reference to the table, and a write semaphore (if the table is public)
+  """
   @opaque t ::
             {:private | :protected, pid, :ets.table()}
             | {:public, pid, :ets.table(), :atomics.atomics_ref()}
-  @type location :: {pos_integer(), pos_integer()}
-  @type layout :: location | {0, 0}
-  @type update ::
-          {:xterm_console_update, from :: location, to :: location, cursor :: location,
-           last_cell :: location}
+
+  @typedoc """
+  coordinate information for a character in the console.
+  """
+  @type location :: {row :: pos_integer(), column :: pos_integer()}
+
+  @typedoc """
+  the layout of the console, which should corresppond to the number of rows
+  and columns in the primary view of the console in html.
+  """
+  @type layout :: location
+
+  @typedoc """
+  the contents of the "cells" section of the table.
+  """
   @type cellinfo :: {location, Cell.t()}
 
   ############################################################################

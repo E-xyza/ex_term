@@ -26,14 +26,24 @@ defmodule ExTerm.CSS do
   @builtins @builtin_path
             |> File.ls!()
             |> Enum.map(&String.to_atom(Path.rootname(&1)))
-  @default_css_map Map.new(@builtins, &{&1, File.read!(Path.join(@builtin_path, "#{&1}.css"))})
+  @builtin_css_map Map.new(@builtins, &{&1, File.read!(Path.join(@builtin_path, "#{&1}.css"))})
 
   # private accessor functions available to the Router plug.
   def builtins, do: @builtins
 
-  def default_css_map, do: @default_css_map
-
   def render(assigns) do
+    assigns =
+      Map.update!(assigns, :css, fn
+        builtin when builtin in @builtins ->
+          Map.fetch!(@builtin_css_map, builtin)
+
+        {:priv, app, file} ->
+          :ex_term
+          |> Application.fetch_env!(app)
+          |> List.keyfind!(file, 0)
+          |> elem(1)
+      end)
+
     ~H"""
     <style>
     <%= Phoenix.HTML.raw(@css) %>

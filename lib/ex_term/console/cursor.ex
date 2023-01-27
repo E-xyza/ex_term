@@ -1,4 +1,5 @@
 defmodule ExTerm.Console.Cursor do
+  @doc false
   alias ExTerm.Console
   alias ExTerm.Console.Cell
   alias ExTerm.Console.Update

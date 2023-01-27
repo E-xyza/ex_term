@@ -1,7 +1,41 @@
 defmodule ExTerm.TerminalBackend do
   @moduledoc """
-  """
+  Default backend that creates a `ExTerm.IoServer` process and forwards all
+  callbacks to its wrapping module.  By default, this is set to
+  `ExTerm.TerminalBackend.IoServer`.
 
+  ### TerminalBackend specific options:
+
+  This option can be set in the router declaration (see `ExTerm.Router`)
+
+  - `:io_server` a module, should be a supervisable `GenServer` which
+    satisfies a minimal set of `ExTerm.IoServer` callbacks.  The required
+    implementations are as follows:
+
+    - *list coming in v 0.3.0*
+
+    #### Example
+
+    ```
+    live_term "/", pubsub: MyWebApp.PubSub, io_server: MyIoServer
+    ```
+
+  ### TerminalBackend.IoServer specific
+
+  This option can be set in the router declaration (see `ExTerm.Router`)
+
+  - `:terminal` a (module, function, args) for the function that should be
+    run inside of the terminal task.  This should be a REPL that takes over
+    the task, and typically will be an infinite loop (return type `no_return`).
+    If the function terminates, the io server will suffer a fatal error and
+    the terminal liveview will be rendered unusable.
+
+    #### Example
+
+    ```
+    live_term "/", pubsub: MyWebApp.PubSub, terminal: {MyModule, :run, []}
+    ```
+  """
   alias ExTerm.Backend
   alias Phoenix.PubSub
   import Phoenix.Component
@@ -15,10 +49,10 @@ defmodule ExTerm.TerminalBackend do
 
     {:ok, pid} = DynamicSupervisor.start_child(ExTerm.BackendSupervisor, {io_server, opts})
 
-    pubsub_server = Keyword.fetch!(opts, :pubsub_server)
+    pubsub = Keyword.fetch!(opts, :pubsub)
     pubsub_topic = io_server.pubsub_topic(pid)
 
-    PubSub.subscribe(pubsub_server, pubsub_topic)
+    PubSub.subscribe(pubsub, pubsub_topic)
 
     # monitor the process, LiveView should know when its child has died.
     Process.monitor(pid)

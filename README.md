@@ -41,10 +41,10 @@ PubSub server associated with your web server.
 ```elixir
 import ExTerm.Router
 
-scope "/" do
+scope "/live_term" do
   pipe_through :browser
 
-  live_term "/", pubsub_server: MyAppWeb.PubSub
+  live_term "/", pubsub: MyAppWeb.PubSub
 end
 ```
 

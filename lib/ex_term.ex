@@ -38,10 +38,10 @@ defmodule ExTerm do
     ```elixir
     import ExTerm.Router
 
-    scope "/" do
+    scope "/live_term" do
       pipe_through :browser
 
-      live_term "/", pubsub_server: MyAppWeb.PubSub
+      live_term "/", pubsub: MyAppWeb.PubSub
     end
     ```
 
@@ -50,10 +50,10 @@ defmodule ExTerm do
     ```elixir
     import ExTerm.Router
 
-    scope "/" do
+    scope "/live_term" do
       pipe_through :browser
 
-      live_term "/", pubsub_server: MyAppWeb.PubSub, terminal: {__MODULE__, :function, []}
+      live_term "/", pubsub: MyAppWeb.PubSub, terminal: {__MODULE__, :function, []}
     end
     ```
 
@@ -63,10 +63,10 @@ defmodule ExTerm do
     ```elixir
     import ExTerm.Router
 
-    scope "/" do
+    scope "/live_term" do
       pipe_through :browser
 
-      live_term "/", MyBackend, pubsub_server: MyAppWeb.PubSub
+      live_term "/", MyBackend, pubsub: MyAppWeb.PubSub
     end
     ```
 
@@ -78,14 +78,14 @@ defmodule ExTerm do
   the css option, as follows:
 
   ```elixir
-    live_term "/", pubsub_server: MyAppWeb.PubSub, css: :bw
+    live_term "/", pubsub: MyAppWeb.PubSub, css: :bw
   ```
 
   To use a custom layout, put the layout file in the `priv` directory of your
   applicatyon and pass the relative path as follows:
 
   ```elixir
-    live_term "/", MyBackend, pubsub_server: MyAppWeb.PubSub, css: {:priv, my_app, "path/to/my_layout.css"}
+    live_term "/", MyBackend, pubsub: MyAppWeb.PubSub, css: {:priv, my_app, "path/to/my_layout.css"}
   ```
 
   Note that this content must be available at compile time.
@@ -234,8 +234,12 @@ defmodule ExTerm do
     socket.assigns.backend.on_paste(string, socket)
   end
 
-  def handle_event(type, payload, socket) do
-    socket.assigns.backend.handle_event(type, payload, socket)
+  def handle_event(type, payload, socket = %{assigns: %{backend: backend}}) do
+    if function_exported?(backend, :on_event, 3) do
+      socket.assigns.backend.on_event(type, payload, socket)
+    else
+      {:noreply, socket}
+    end
   end
 
   @doc false

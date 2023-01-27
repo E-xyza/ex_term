@@ -6,7 +6,7 @@ config :phoenix, :json_library, Jason
 config :ex_term, ExTermWeb.Endpoint,
   url: [host: "localhost"],
   render_errors: [view: ExTermWeb.ErrorView, accepts: ~w(html json), layout: false],
-  pubsub_server: ExTerm.PubSub,
+  pubsub: ExTerm.PubSub,
   live_view: [signing_salt: "cEy4s8JU"]
 
 # Configure esbuild (the version is required)
