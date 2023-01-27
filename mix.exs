@@ -6,8 +6,8 @@ defmodule ExTerm.MixProject do
   def project do
     [
       app: :ex_term,
-      version: "0.1.0",
-      elixir: "~> 1.12",
+      version: "0.2.0",
+      elixir: "~> 1.14",
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: Mix.compilers(),
       start_permanent: Mix.env() == :prod,
