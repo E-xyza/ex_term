@@ -4,7 +4,6 @@ defmodule ExTerm.Backend do
   respond to inbound user events.
   """
 
-  alias Phoenix.LiveView
   alias Phoenix.LiveView.Socket
 
   @type json :: String.t() | nil | boolean | number | [json] | %{optional(String.t()) => json}
@@ -18,7 +17,7 @@ defmodule ExTerm.Backend do
   An ExTerm terminal does not display any data until the websocket connection
   has been established.
   """
-  @callback on_connect(params, session, LiveView.socket()) :: {:ok, Console.t(), Socket.t()}
+  @callback on_connect(params, session, Socket.t()) :: {:ok, Console.t(), Socket.t()}
 
   @doc """
   forwarded from the `c:Phoenix.LiveView.handle_event/3` callback.

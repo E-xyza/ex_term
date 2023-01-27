@@ -93,7 +93,7 @@ defmodule ExTerm.IOServer do
   The `get_condition` is packaged in the following ways:
   - for `:get_until`, it is passed as `{:until, {module, function, args}}`.
   - for `:get_chars`, it is passed as `{:chars, count}`
-  - for `:get_line, it is passed as `:line`
+  - for `:get_line`, it is passed as `:line`
 
   This request expects a reply of `data` `:eof` or `{:error, error}` in one of the
   following ways:
