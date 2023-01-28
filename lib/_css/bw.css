@@ -7,6 +7,14 @@
     --exterm-magenta: white;
     --exterm-cyan: white;
     --exterm-white: white;
+    --exterm-light-black: white;
+    --exterm-light-red: white;
+    --exterm-light-green: white;
+    --exterm-light-yellow: white;
+    --exterm-light-blue: white;
+    --exterm-light-magenta: white;
+    --exterm-light-cyan: white;
+    --exterm-light-white: white;
 }
 
 div.exterm-focused {
