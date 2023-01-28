@@ -319,7 +319,7 @@ defmodule ExTerm.TerminalBackend.IOServer do
 
   defp tab_table(_, [], _, _, _, so_far), do: Enum.reverse(so_far)
 
-  defp tab_table(console, opts = [this | rest], {row, col}, spacing, columns, so_far) do
+  defp tab_table(console, choices = [this | rest], {row, col}, spacing, columns, so_far) do
     # get the length of the current row
     columns =
       case Console.columns(console, row) do
@@ -336,11 +336,8 @@ defmodule ExTerm.TerminalBackend.IOServer do
           truncated | so_far
         ])
 
-      next when next === columns + 1 ->
-        tab_table(console, rest, {row + 1, 1}, spacing, columns, [?\n, this | so_far])
-
       next when next > columns ->
-        tab_table(console, rest, {row + 1, 1}, spacing, columns, opts)
+        tab_table(console, choices, {row + 1, 1}, spacing, columns, [?\n | so_far])
 
       next when next <= columns ->
         new_this = this |> IO.iodata_to_binary() |> String.pad_trailing(spacing)
