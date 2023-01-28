@@ -2,6 +2,8 @@
 
 ![tests](https://github.com/e-xyza/ex_term/actions/workflows/test_flow.yml/badge.svg)
 
+![screenshot](screenshot.png)
+
 ExTerm is an terminal `Phoenix.LiveView` component.  ExTerm is responsible
 for converting erlang IO protocol messages into web output and translating
 web input into responses in the IO protocol.
