@@ -105,20 +105,13 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   @spec insert_string_rows(state(insert), String.t()) :: state(insert) | state(paint)
-  def insert_string_rows(
-        tracker = %{mode: {:insert, _}, cursor: {row, _}, layout: {_, columns}},
-        string
-      ) do
+  def insert_string_rows(tracker = %{mode: {:insert, _}, cursor: {row, _}}, string) do
     # NB: don't cache the number of columns.  Row length should be fixed based
     # on the existing capacity of the column, so we have to check each time.
 
     # for string row insertion, we're going to always add the row in to the cells
     # buffer, because this will always be "in-order".
-    columns =
-      case Console.columns(tracker.console, row) do
-        0 -> columns
-        other -> other
-      end
+    columns = Console.columns(tracker.console, row)
 
     case _blit_string_row(tracker, columns, string) do
       {new_tracker, leftover} ->
@@ -182,7 +175,7 @@ defmodule ExTerm.Console.StringTracker do
 
   def _blit_string_row(tracker, _, ""), do: tracker
 
-  def _blit_string_row(tracker = %{mode: :put, cursor: {row, _}, layout: {_, columns}}, 0, string) do
+  def _blit_string_row(tracker = %{cursor: {row, _}, layout: {_, columns}}, 0, string) do
     # since string MUST have a payload, obtain the layout columns and add that row in
 
     new_cells = Enum.reduce(1..columns, tracker.cells, &[{{row, &1}, %Cell{}} | &2])
@@ -195,6 +188,7 @@ defmodule ExTerm.Console.StringTracker do
 
   def _blit_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string)
       when column > columns do
+
     # make sure that the update reflects that this is the end line
     new_update =
       tracker
