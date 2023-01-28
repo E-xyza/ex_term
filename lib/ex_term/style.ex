@@ -166,7 +166,7 @@ defmodule ExTerm.Style do
 
   def from_ansi(_style, _rest), do: :not_style
 
-  @keys ~w(color bgcolor blink intensity frame conceal italic underline crossed_out overlined white-space overflow-anchor)a
+  @keys ~w(color background-color blink intensity frame conceal italic underline crossed_out overlined white-space overflow-anchor)a
 
   defp get_color(integer) do
     base = integer - 16
