@@ -2,9 +2,13 @@ defmodule ExTerm do
   @moduledoc """
   ## Description
 
-  ExTerm is an terminal `Phoenix.LiveView` component.  ExTerm is responsible
-  for converting erlang IO protocol messages into web output and translating
-  web input into responses in the IO protocol.
+  ExTerm is a terminal `Phoenix.LiveView`.  By default, ExTerm provides an IEx
+  terminal usable as a web interface, however, this is customizable and you may
+  use ExTerm for other CLIs.
+
+  Under the hood, ExTerm is a generic interface for converting erlang IO protocol
+  messages into web output and translating web input into responses in the IO
+  protocol.
 
   ## Installation
 

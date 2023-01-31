@@ -188,7 +188,6 @@ defmodule ExTerm.Console.StringTracker do
 
   def _blit_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string)
       when column > columns do
-
     # make sure that the update reflects that this is the end line
     new_update =
       tracker
