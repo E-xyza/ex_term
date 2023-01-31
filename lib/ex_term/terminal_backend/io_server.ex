@@ -255,7 +255,6 @@ defmodule ExTerm.TerminalBackend.IOServer do
          "Tab",
          state = %{console: console, prompt: prompt = %{location: {row, column}}}
        ) do
-
     {new_prompt, new_row} =
       prompt.precursor
       |> Enum.flat_map(&String.to_charlist/1)

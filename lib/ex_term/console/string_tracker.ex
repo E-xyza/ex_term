@@ -125,21 +125,32 @@ defmodule ExTerm.Console.StringTracker do
   @spec flush_updates(state(insert)) :: Range.t()
   @spec flush_updates(state(put)) :: :ok
   @spec flush_updates(state(paint)) :: :ok
-  def flush_updates(tracker = %{mode: {:insert, from_row}, rows_inserted: rows, cells: cells, console: console, layout: {_, columns}}) do
+  def flush_updates(
+        tracker = %{
+          mode: {:insert, from_row},
+          rows_inserted: rows,
+          cells: cells,
+          console: console,
+          layout: {_, columns}
+        }
+      ) do
     # note that count has an extra because we do a hard return
     # at the end of an insert in all cases.
 
-    cells = cells
-    |> Enum.group_by(fn {{row, _}, _} -> row end)
-    |> Enum.flat_map(fn {row, cells} ->
-      List.wrap(
-        if Console.columns(console, row) === 0 do
-          cells
-          |> Enum.sort()
-          |> fill_row(row, columns)
-        end
-      )
-    end)
+    cells =
+      cells
+      |> Enum.group_by(fn {{row, _}, _} -> row end)
+      |> Enum.flat_map(fn {row, cells} ->
+        columns =
+          case Console.columns(console, row) do
+            0 -> columns
+            existing_columns -> existing_columns
+          end
+
+        cells
+        |> Enum.sort()
+        |> fill_row(row, columns)
+      end)
 
     update_cells =
       console
@@ -167,6 +178,15 @@ defmodule ExTerm.Console.StringTracker do
     range
   end
 
+  def flush_updates(tracker) do
+    tracker.console
+    |> Console.insert(tracker.cells)
+    |> Console.move_cursor(tracker.cursor)
+
+    Update.merge(tracker.update)
+    :ok
+  end
+
   defp fill_row(cells, row, columns, so_far \\ [])
 
   defp fill_row([], row, columns, _so_far) do
@@ -175,25 +195,19 @@ defmodule ExTerm.Console.StringTracker do
   end
 
   defp fill_row([last = {{_, last_column}, _}], row, columns, so_far) do
-    list = for column <- last_column..columns, reduce: [last | so_far] do
-      acc -> [{{row, column}, %Cell{}} | acc]
-    end
+    list =
+      for column <- last_column..columns, reduce: [last | so_far] do
+        acc -> [{{row, column}, %Cell{}} | acc]
+      end
+
     add_sentinel(list, row, columns)
   end
 
-  defp fill_row([head | rest], row, columns, so_far), do: fill_row(rest, row, columns, [head | so_far])
+  defp fill_row([head | rest], row, columns, so_far),
+    do: fill_row(rest, row, columns, [head | so_far])
 
   defp add_sentinel(list, row, columns) do
     [{{row, columns + 1}, Cell.sentinel()} | list]
-  end
-
-  def flush_updates(tracker) do
-    tracker.console
-    |> Console.insert(tracker.cells)
-    |> Console.move_cursor(tracker.cursor)
-
-    Update.merge(tracker.update)
-    :ok
   end
 
   @spec _blit_string_row(state(put), pos_integer, String.t()) :: state(put) | state(paint)
@@ -218,7 +232,6 @@ defmodule ExTerm.Console.StringTracker do
 
   def _blit_string_row(tracker = %{cursor: cursor = {row, column}}, columns, string)
       when column > columns do
-
     # make sure that the update reflects that this is the end line
     new_update =
       tracker
