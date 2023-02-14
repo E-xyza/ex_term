@@ -125,15 +125,37 @@ defmodule ExTerm.Console.StringTracker do
   @spec flush_updates(state(insert)) :: Range.t()
   @spec flush_updates(state(put)) :: :ok
   @spec flush_updates(state(paint)) :: :ok
-  # flush updates handles three cases depending on what the state of the string tracker
-  # is.  If it's in string mode, then it immediately
-  def flush_updates(tracker = %{mode: {:insert, from_row}, rows_inserted: rows}) do
+  def flush_updates(
+        tracker = %{
+          mode: {:insert, from_row},
+          rows_inserted: rows,
+          cells: cells,
+          console: console,
+          layout: {_, columns}
+        }
+      ) do
     # note that count has an extra because we do a hard return
     # at the end of an insert in all cases.
+
+    cells =
+      cells
+      |> Enum.group_by(fn {{row, _}, _} -> row end)
+      |> Enum.flat_map(fn {row, cells} ->
+        columns =
+          case Console.columns(console, row) do
+            0 -> columns
+            existing_columns -> existing_columns
+          end
+
+        cells
+        |> Enum.sort()
+        |> fill_row(row, columns)
+      end)
+
     update_cells =
-      tracker.console
+      console
       |> Console._bump_rows(from_row, rows - 1)
-      |> Enum.reverse(tracker.cells)
+      |> Enum.reverse(cells)
 
     new_cursor =
       case old_cursor = tracker.old_cursor do
@@ -144,7 +166,7 @@ defmodule ExTerm.Console.StringTracker do
           {row + rows - 1, column}
       end
 
-    tracker.console
+    console
     |> Console.insert(update_cells)
     |> Console.move_cursor(new_cursor)
 
@@ -165,6 +187,29 @@ defmodule ExTerm.Console.StringTracker do
     :ok
   end
 
+  defp fill_row(cells, row, columns, so_far \\ [])
+
+  defp fill_row([], row, columns, _so_far) do
+    list = for column <- columns..1//-1, do: {{row, column}, %Cell{}}
+    add_sentinel(list, row, columns)
+  end
+
+  defp fill_row([last = {{_, last_column}, _}], row, columns, so_far) do
+    list =
+      for column <- last_column..columns, reduce: [last | so_far] do
+        acc -> [{{row, column}, %Cell{}} | acc]
+      end
+
+    add_sentinel(list, row, columns)
+  end
+
+  defp fill_row([head | rest], row, columns, so_far),
+    do: fill_row(rest, row, columns, [head | so_far])
+
+  defp add_sentinel(list, row, columns) do
+    [{{row, columns + 1}, Cell.sentinel()} | list]
+  end
+
   @spec _blit_string_row(state(put), pos_integer, String.t()) :: state(put) | state(paint)
   @spec _blit_string_row(state(insert), pos_integer, String.t()) :: state(insert) | state(paint)
   @spec _blit_string_row(state(paint), pos_integer, String.t()) :: state(paint)
@@ -176,13 +221,12 @@ defmodule ExTerm.Console.StringTracker do
   def _blit_string_row(tracker, _, ""), do: tracker
 
   def _blit_string_row(tracker = %{cursor: {row, _}, layout: {_, columns}}, 0, string) do
-    # since string MUST have a payload, obtain the layout columns and add that row in
-
-    new_cells = Enum.reduce(1..columns, tracker.cells, &[{{row, &1}, %Cell{}} | &2])
-    Console.insert(tracker.console, [{{row, columns + 1}, Cell.sentinel()} | new_cells])
+    if tracker.mode === :put do
+      Console.new_row(tracker.console, :end)
+    end
 
     tracker
-    |> Map.replace!(:update, Update.merge_changes(tracker.update, {{row, 1}, {row, :end}}))
+    |> Map.update!(:update, &Update.merge_changes(&1, {{row, 1}, {row, :end}}))
     |> _blit_string_row(columns, string)
   end
 
