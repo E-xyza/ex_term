@@ -27,17 +27,6 @@ def deps do
 end
 ```
 
-```elixir
-
-def deps do
-[
-  # ...
-  {:ex_term, "~> 0.2"}
-  # ...
-]
-end
-```
-
 ### How to create a live terminal in your Phoenix router
 
 You must supply a `Phoenix.PubSub` server that is the communication channel
